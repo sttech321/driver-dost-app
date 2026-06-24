@@ -6,10 +6,10 @@ import { AppStackParamList, TabParamList } from '@/navigation/types';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { colors, radius, shadow, spacing, typography } from '@/theme';
-import { Screen, Icon, IconName, DriverCard, Avatar } from '@/components';
+import { Screen, Icon, IconName, DriverCard, Avatar, LocationPickerModal } from '@/components';
 import { driverApi } from '@/api/driver.api';
 import { Driver } from '@/api/types';
-import { useLocation } from '@/hooks/useLocation';
+import { useAppLocation } from '@/context/LocationContext';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<TabParamList, 'Home'>,
@@ -25,25 +25,23 @@ const QUICK_ACTIONS: { key: string; label: string; icon: IconName; route: keyof 
 
 export function DashboardScreen() {
   const navigation = useNavigation<Nav>();
-  const { coords, fetchCurrent } = useLocation();
+  const { location } = useAppLocation();
   const [drivers, setDrivers] = useState<Driver[]>([]);
+  const [showLocationPicker, setShowLocationPicker] = useState(false);
 
+  // Recommended drivers near the user's chosen location.
   const loadDrivers = useCallback(async () => {
     try {
       const data = await driverApi.recommended({
-        lat: coords?.lat,
-        lng: coords?.lng,
+        lat: location.lat,
+        lng: location.lng,
         limit: 10,
       });
       setDrivers(data);
     } catch {
       /* surfaced as empty list */
     }
-  }, [coords]);
-
-  useEffect(() => {
-    fetchCurrent();
-  }, [fetchCurrent]);
+  }, [location.lat, location.lng]);
 
   useEffect(() => {
     loadDrivers();
@@ -58,11 +56,13 @@ export function DashboardScreen() {
       <View style={styles.padded}>
         {/* Location + notifications */}
         <View style={styles.topRow}>
-          <View>
+          <View style={{ flex: 1 }}>
             <Text style={typography.caption}>Your Location</Text>
-            <Pressable style={styles.locationRow}>
+            <Pressable style={styles.locationRow} onPress={() => setShowLocationPicker(true)}>
               <Icon name="map-pin" size={18} color={colors.primary} />
-              <Text style={styles.locationText}>Mohali, Punjab</Text>
+              <Text style={styles.locationText} numberOfLines={1}>
+                {location.label}
+              </Text>
               <Icon name="chevron-down" size={18} color={colors.primary} />
             </Pressable>
           </View>
@@ -135,6 +135,11 @@ export function DashboardScreen() {
           <Text style={styles.hireEmoji}>🚙</Text>
         </View>
       </View>
+
+      <LocationPickerModal
+        visible={showLocationPicker}
+        onClose={() => setShowLocationPicker(false)}
+      />
     </Screen>
   );
 }
@@ -145,7 +150,7 @@ const styles = StyleSheet.create({
   padded: { paddingHorizontal: spacing.xl, paddingTop: spacing.lg, gap: spacing.lg },
   topRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   locationRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.xs, marginTop: 2 },
-  locationText: { ...typography.h3 },
+  locationText: { ...typography.h3, flexShrink: 1 },
   bell: {
     width: 48,
     height: 48,
