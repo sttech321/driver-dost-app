@@ -1,0 +1,62 @@
+{
+  "expo": {
+    "name": "Driver Dost",
+    "slug": "driver-dost-app",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "scheme": "driverdost",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "splash": {
+      "backgroundColor": "#2F6BC4",
+      "resizeMode": "contain"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.driverdost.app",
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We need your location to pin-point your pickup for easy booking."
+      }
+    },
+    "android": {
+      "package": "com.driverdost.app",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_COARSE_LOCATION"
+      ],
+      "config": {
+        "googleMaps": {
+          "apiKey": "REPLACE_WITH_ANDROID_GOOGLE_MAPS_API_KEY"
+        }
+      }
+    },
+    "plugins": [
+      [
+        "expo-location",
+        {
+          "locationWhenInUsePermission": "We need your location to pin-point your pickup for easy booking."
+        }
+      ],
+      "expo-font",
+      "expo-asset"
+    ],
+    "extra": {
+      "apiUrl": "http://localhost:4000/api",
+      "firebase": {
+        "apiKey": "",
+        "authDomain": "",
+        "projectId": "",
+        "appId": ""
+      },
+      "googleAuth": {
+        "expoClientId": "",
+        "iosClientId": "",
+        "androidClientId": "",
+        "webClientId": ""
+      }
+    }
+  }
+}
