@@ -47,7 +47,7 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const center = useRef({ ...(initialCoords ?? DEFAULT) });
-  const debounce = useRef<ReturnType<typeof setTimeout>>();
+  const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
   const reqId = useRef(0);
   const [picked, setPicked] = useState<Place | null>(null);
   const [loading, setLoading] = useState(false);

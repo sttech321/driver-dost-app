@@ -23,7 +23,7 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
   const center = useRef({ ...(initialCoords ?? DEFAULT) });
   const [picked, setPicked] = useState<Place | null>(null);
   const [loading, setLoading] = useState(false);
-  const debounce = useRef<ReturnType<typeof setTimeout>>();
+  const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
   const reqId = useRef(0);
   const { fetchCurrent } = useLocation();
 

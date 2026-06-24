@@ -48,7 +48,7 @@ export function PlaceAutocomplete({
 
   const justSelected = useRef(false);
   const selectedLabel = useRef<string | null>(null);
-  const debounce = useRef<ReturnType<typeof setTimeout>>();
+  const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
   const reqId = useRef(0);
   const { fetchCurrent } = useLocation();
 
