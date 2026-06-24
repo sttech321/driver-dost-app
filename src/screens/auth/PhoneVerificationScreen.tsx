@@ -8,7 +8,7 @@ import { authApi } from '@/api/auth.api';
 import { useAuth } from '@/context/AuthContext';
 
 type Props = NativeStackScreenProps<AuthStackParamList, 'PhoneVerification'>;
-const OTP_LENGTH = 4;
+const OTP_LENGTH = 6;
 const KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '', '0', 'del'];
 
 export function PhoneVerificationScreen({ navigation, route }: Props) {
@@ -108,12 +108,12 @@ const styles = StyleSheet.create({
   otpRow: {
     flexDirection: 'row',
     justifyContent: 'center',
-    gap: spacing.xl,
+    gap: spacing.md,
     marginTop: spacing.xxxl,
   },
-  otpCell: { alignItems: 'center', width: 44 },
-  otpDigit: { fontSize: 34, fontWeight: '700', color: colors.textPrimary, height: 44 },
-  otpUnderline: { width: 32, height: 2, backgroundColor: colors.fieldBorder },
+  otpCell: { alignItems: 'center', width: 42 },
+  otpDigit: { fontSize: 30, fontWeight: '700', color: colors.textPrimary, height: 42 },
+  otpUnderline: { width: 30, height: 2, backgroundColor: colors.fieldBorder },
   verifyBtn: { marginTop: spacing.xxxl },
   resend: { alignItems: 'center', marginTop: spacing.lg },
   resendText: { ...typography.label, color: colors.primary },
