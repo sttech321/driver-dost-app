@@ -18,6 +18,7 @@ import { Avatar, Icon } from '@/components';
 import { bookingApi } from '@/api/booking.api';
 import { driverPortalApi } from '@/api/driverPortal.api';
 import { ChatMessage } from '@/api/types';
+import { getSocket, joinBooking } from '@/realtime/socket';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Chat'>;
 
@@ -26,6 +27,10 @@ export function ChatScreen({ navigation, route }: Props) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const listRef = useRef<FlatList<ChatMessage>>(null);
+
+  // Append without duplicating (socket echo + poll can both deliver a message).
+  const appendMessage = (m: ChatMessage) =>
+    setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
 
   const load = async () => {
     try {
@@ -40,8 +45,22 @@ export function ChatScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 4000); // light polling so both sides see new messages
-    return () => clearInterval(t);
+    // Realtime: join the room and receive messages instantly.
+    joinBooking(bookingId);
+    const socket = getSocket();
+    const onMessage = (m: ChatMessage) => {
+      if (m.bookingId === bookingId) {
+        appendMessage(m);
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
+      }
+    };
+    socket?.on('chat:message', onMessage);
+    // Fallback poll (socket is primary; reconciles if it dropped).
+    const t = setInterval(load, 20000);
+    return () => {
+      socket?.off('chat:message', onMessage);
+      clearInterval(t);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingId]);
 
@@ -49,11 +68,17 @@ export function ChatScreen({ navigation, route }: Props) {
     const value = text.trim();
     if (!value) return;
     setText('');
+    const socket = getSocket();
     try {
-      const msg = asDriver
-        ? await driverPortalApi.sendMessage(bookingId, value)
-        : await bookingApi.sendMessage(bookingId, value, 'USER');
-      setMessages((m) => [...m, msg]);
+      if (socket?.connected) {
+        // Server persists + broadcasts (echo arrives via 'chat:message').
+        socket.emit('chat:message', { bookingId, text: value });
+      } else {
+        const msg = asDriver
+          ? await driverPortalApi.sendMessage(bookingId, value)
+          : await bookingApi.sendMessage(bookingId, value, 'USER');
+        appendMessage(msg);
+      }
       setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 50);
     } catch {
       /* ignore */

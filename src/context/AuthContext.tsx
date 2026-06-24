@@ -3,6 +3,7 @@ import { setAuthToken, getAuthToken } from '@/api/client';
 import { authApi } from '@/api/auth.api';
 import { userApi } from '@/api/user.api';
 import { AuthResult, User } from '@/api/types';
+import { connectSocket, disconnectSocket } from '@/realtime/socket';
 
 interface AuthContextValue {
   user: User | null;
@@ -38,6 +39,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     })();
   }, []);
+
+  // Keep one realtime socket alive while logged in.
+  useEffect(() => {
+    let active = true;
+    if (user) {
+      getAuthToken().then((token) => {
+        if (active && token) connectSocket(token);
+      });
+    } else {
+      disconnectSocket();
+    }
+    return () => {
+      active = false;
+    };
+  }, [user]);
 
   const signIn = useCallback(async (result: AuthResult) => {
     await setAuthToken(result.token);

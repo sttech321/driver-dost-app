@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
@@ -9,6 +9,7 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Screen, Icon, Button } from '@/components';
 import { driverPortalApi } from '@/api/driverPortal.api';
 import { Booking, BookingStatus } from '@/api/types';
+import { getSocket } from '@/realtime/socket';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<DriverTabParamList, 'Trips'>,
@@ -40,11 +41,27 @@ export function DriverTripsScreen() {
     }
   }, []);
 
+  // Realtime: refresh when a ride's status changes (e.g. rider cancels).
+  // Stays mounted-scoped (cheap, push-only) — no background polling.
   useEffect(() => {
-    load();
-    const t = setInterval(load, 5000);
-    return () => clearInterval(t);
+    const socket = getSocket();
+    const onChange = () => load();
+    socket?.on('booking:status', onChange);
+    socket?.on('booking:accepted', onChange);
+    return () => {
+      socket?.off('booking:status', onChange);
+      socket?.off('booking:accepted', onChange);
+    };
   }, [load]);
+
+  // Poll only while this tab is focused (fallback if socket drops).
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      const t = setInterval(load, 15000);
+      return () => clearInterval(t);
+    }, [load])
+  );
 
   const advance = async (b: Booking) => {
     const next = NEXT[b.status];

@@ -1,10 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Screen, Icon, IconName, Button } from '@/components';
 import { driverPortalApi } from '@/api/driverPortal.api';
 import { Booking, BookingType } from '@/api/types';
 import { formatSchedule } from '@/utils/formatSchedule';
+import { getSocket } from '@/realtime/socket';
 
 const TYPE_META: Record<BookingType, { label: string; icon: IconName }> = {
   ONE_WAY: { label: 'One Way', icon: 'arrow-up' },
@@ -25,12 +27,31 @@ export function DriverRequestsScreen() {
     }
   }, []);
 
-  // Poll for new ride requests.
+  // Realtime: new requests appear instantly; taken/cancelled ones disappear.
+  // Listeners stay mounted (push-only, cheap) so the list is fresh even in the
+  // background — no polling needed for liveness.
   useEffect(() => {
-    load();
-    const t = setInterval(load, 4000);
-    return () => clearInterval(t);
-  }, [load]);
+    const socket = getSocket();
+    const onNew = (b: Booking) =>
+      setRequests((prev) => (prev.some((x) => x.id === b.id) ? prev : [b, ...prev]));
+    const onTaken = ({ bookingId }: { bookingId: string }) =>
+      setRequests((prev) => prev.filter((x) => x.id !== bookingId));
+    socket?.on('request:new', onNew);
+    socket?.on('request:taken', onTaken);
+    return () => {
+      socket?.off('request:new', onNew);
+      socket?.off('request:taken', onTaken);
+    };
+  }, []);
+
+  // Poll only while focused (fallback if socket drops).
+  useFocusEffect(
+    useCallback(() => {
+      load();
+      const t = setInterval(load, 15000);
+      return () => clearInterval(t);
+    }, [load])
+  );
 
   const accept = async (b: Booking) => {
     setAccepting(b.id);

@@ -7,6 +7,7 @@ import { Avatar, Icon, MapPlaceholder, ScreenHeader } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { bookingApi } from '@/api/booking.api';
 import { Booking } from '@/api/types';
+import { getSocket, joinBooking } from '@/realtime/socket';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'DriverArriving'>;
 
@@ -14,7 +15,8 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
   const { bookingId } = route.params;
   const [booking, setBooking] = useState<Booking | null>(null);
 
-  // Poll until a driver accepts (bookings start unassigned / REQUESTED).
+  // Realtime: a driver accepting / updating status pushes here instantly.
+  // A slow poll stays as a fallback if the socket dropped.
   useEffect(() => {
     let active = true;
     const fetchOnce = async () => {
@@ -22,13 +24,24 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
         const b = await bookingApi.get(bookingId);
         if (active) setBooking(b);
       } catch {
-        /* keep polling */
+        /* keep trying */
       }
     };
     fetchOnce();
-    const t = setInterval(fetchOnce, 4000);
+
+    joinBooking(bookingId);
+    const socket = getSocket();
+    const onUpdate = (b: Booking) => {
+      if (active && b?.id === bookingId) setBooking(b);
+    };
+    socket?.on('booking:accepted', onUpdate);
+    socket?.on('booking:status', onUpdate);
+
+    const t = setInterval(fetchOnce, 20000);
     return () => {
       active = false;
+      socket?.off('booking:accepted', onUpdate);
+      socket?.off('booking:status', onUpdate);
       clearInterval(t);
     };
   }, [bookingId]);
