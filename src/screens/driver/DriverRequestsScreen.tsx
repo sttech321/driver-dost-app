@@ -4,6 +4,7 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Screen, Icon, IconName, Button } from '@/components';
 import { driverPortalApi } from '@/api/driverPortal.api';
 import { Booking, BookingType } from '@/api/types';
+import { formatSchedule } from '@/utils/formatSchedule';
 
 const TYPE_META: Record<BookingType, { label: string; icon: IconName }> = {
   ONE_WAY: { label: 'One Way', icon: 'arrow-up' },
@@ -93,6 +94,15 @@ export function DriverRequestsScreen() {
                 {item.hours != null && <Text style={typography.caption}>{item.hours} hrs</Text>}
               </View>
 
+              {item.scheduledAt && (
+                <View style={styles.scheduleBadge}>
+                  <Icon name="calendar" size={14} color={colors.primary} />
+                  <Text style={styles.scheduleText}>
+                    Scheduled: {formatSchedule(new Date(item.scheduledAt))}
+                  </Text>
+                </View>
+              )}
+
               <Button
                 title="Accept Request"
                 onPress={() => accept(item)}
@@ -137,5 +147,17 @@ const styles = StyleSheet.create({
   },
   routeRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   metaRow: { flexDirection: 'row', gap: spacing.lg, marginBottom: spacing.xs },
+  scheduleBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    alignSelf: 'flex-start',
+    backgroundColor: colors.primarySoft,
+    borderRadius: radius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    marginBottom: spacing.xs,
+  },
+  scheduleText: { ...typography.caption, color: colors.primary, fontWeight: '600' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
 });

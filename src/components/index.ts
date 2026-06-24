@@ -14,3 +14,4 @@ export { SlideButton } from './SlideButton';
 export { DateStrip } from './DateStrip';
 export { HourRangeSlider } from './HourRangeSlider';
 export { GoogleSignInButton } from './GoogleSignInButton';
+export { SchedulePicker } from './SchedulePicker';

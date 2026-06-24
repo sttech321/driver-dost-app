@@ -3,13 +3,14 @@ import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '@/navigation/types';
 import { colors, radius, spacing, typography } from '@/theme';
-import { Button, Icon, MapPlaceholder, PlaceAutocomplete, ScreenHeader } from '@/components';
+import { Button, Icon, MapPlaceholder, PlaceAutocomplete, SchedulePicker, ScreenHeader } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useLocation } from '@/hooks/useLocation';
 import { userApi } from '@/api/user.api';
 import { bookingApi } from '@/api/booking.api';
 import { Place, SavedPlace } from '@/api/types';
 import { resolvePlace } from '@/utils/resolvePlace';
+import { formatSchedule } from '@/utils/formatSchedule';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'OneWay'>;
 
@@ -20,6 +21,8 @@ export function OneWayScreen({ navigation }: Props) {
   const [pickupPlace, setPickupPlace] = useState<Place | null>(null);
   const [destPlace, setDestPlace] = useState<Place | null>(null);
   const [savedPlaces, setSavedPlaces] = useState<SavedPlace[]>([]);
+  const [scheduledAt, setScheduledAt] = useState<Date | null>(null);
+  const [showSchedule, setShowSchedule] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -81,6 +84,7 @@ export function OneWayScreen({ navigation }: Props) {
         destinationAddress: destResolved.address || destination,
         destinationLat: destResolved.lat,
         destinationLng: destResolved.lng,
+        scheduledAt: scheduledAt?.toISOString(),
       });
       navigation.navigate('DriverArriving', { bookingId: booking.id });
     } catch (e: any) {
@@ -109,10 +113,10 @@ export function OneWayScreen({ navigation }: Props) {
       <View style={styles.sheet}>
         <View style={styles.grabber} />
 
-        <Pressable style={styles.pickNow}>
-          <Icon name="calendar" size={18} color={colors.textPrimary} />
-          <Text style={styles.pickNowText}>Pick Now</Text>
-          <Icon name="chevron-down" size={18} color={colors.textPrimary} />
+        <Pressable style={styles.pickNow} onPress={() => setShowSchedule(true)}>
+          <Icon name="calendar" size={18} color={colors.primary} />
+          <Text style={styles.pickNowText}>{formatSchedule(scheduledAt)}</Text>
+          <Icon name="chevron-down" size={18} color={colors.primary} />
         </Pressable>
 
         <View style={styles.fields}>
@@ -167,6 +171,16 @@ export function OneWayScreen({ navigation }: Props) {
 
         <Button title="Find a Driver" onPress={findDriver} loading={loading} />
       </View>
+
+      <SchedulePicker
+        visible={showSchedule}
+        value={scheduledAt}
+        onClose={() => setShowSchedule(false)}
+        onConfirm={(d) => {
+          setScheduledAt(d);
+          setShowSchedule(false);
+        }}
+      />
     </View>
   );
 }

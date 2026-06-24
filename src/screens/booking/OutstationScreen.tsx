@@ -3,11 +3,12 @@ import { Alert, Pressable, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '@/navigation/types';
 import { colors, radius, spacing, typography } from '@/theme';
-import { Button, DateStrip, Icon, PlaceAutocomplete, Screen, ScreenHeader } from '@/components';
+import { Button, DateStrip, Icon, PlaceAutocomplete, SchedulePicker, Screen, ScreenHeader } from '@/components';
 import { useLocation } from '@/hooks/useLocation';
 import { bookingApi } from '@/api/booking.api';
 import { OutstationTripType, Place } from '@/api/types';
 import { resolvePlace } from '@/utils/resolvePlace';
+import { formatSchedule } from '@/utils/formatSchedule';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Outstation'>;
 
@@ -21,6 +22,8 @@ export function OutstationScreen({ navigation }: Props) {
   const [destPlace, setDestPlace] = useState<Place | null>(null);
   const [dayIndex, setDayIndex] = useState(0);
   const [date, setDate] = useState<Date>(new Date());
+  const [pickedAt, setPickedAt] = useState<Date | null>(null);
+  const [showSchedule, setShowSchedule] = useState(false);
   const [tripType, setTripType] = useState<OutstationTripType>('ROUND_TRIP');
   const [loading, setLoading] = useState(false);
 
@@ -49,7 +52,8 @@ export function OutstationScreen({ navigation }: Props) {
         Alert.alert('Pick a destination', 'Please choose your destination from the suggestions or the map.');
         return;
       }
-      const scheduledAt = new Date(date);
+      // Pick Now (date+time) takes precedence over the date strip.
+      const scheduledAt = pickedAt ?? date;
       const booking = await bookingApi.createOutstation({
         pickupLabel: pickResolved?.label ?? pickup,
         pickupAddress: pickResolved?.address || pickup,
@@ -99,10 +103,10 @@ export function OutstationScreen({ navigation }: Props) {
       <ScreenHeader onBack={() => navigation.goBack()} title="Outstation Screen" banner />
 
       <View style={styles.body}>
-        <Pressable style={styles.pickNow}>
-          <Icon name="calendar" size={18} color={colors.textPrimary} />
-          <Text style={typography.label}>Pick Now</Text>
-          <Icon name="chevron-down" size={18} color={colors.textPrimary} />
+        <Pressable style={styles.pickNow} onPress={() => setShowSchedule(true)}>
+          <Icon name="calendar" size={18} color={colors.primary} />
+          <Text style={[typography.label, { color: colors.primary }]}>{formatSchedule(pickedAt)}</Text>
+          <Icon name="chevron-down" size={18} color={colors.primary} />
         </Pressable>
 
         <View style={styles.fields}>
@@ -142,6 +146,16 @@ export function OutstationScreen({ navigation }: Props) {
       </View>
 
       <Button title="Schedule Driver" onPress={schedule} loading={loading} />
+
+      <SchedulePicker
+        visible={showSchedule}
+        value={pickedAt}
+        onClose={() => setShowSchedule(false)}
+        onConfirm={(d) => {
+          setPickedAt(d);
+          setShowSchedule(false);
+        }}
+      />
     </Screen>
   );
 }
