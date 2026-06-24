@@ -9,9 +9,13 @@ import { colors } from '@/theme';
 import { Logo } from '@/components';
 
 export function RootNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, locationChecked } = useAuth();
 
-  if (loading) {
+  // Splash while restoring session, or while resolving a rider's saved
+  // location permission (prevents the permission screen flashing on login).
+  const resolvingLocation = !!user && user.role !== 'DRIVER' && !locationChecked;
+
+  if (loading || resolvingLocation) {
     return (
       <View style={styles.splash}>
         <Logo size={28} />

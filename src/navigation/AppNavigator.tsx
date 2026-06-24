@@ -17,18 +17,22 @@ export function AppNavigator() {
   const { locationGranted } = useAuth();
 
   return (
-    <Stack.Navigator
-      screenOptions={{ headerShown: false }}
-      initialRouteName={locationGranted ? 'Tabs' : 'LocationPermission'}
-    >
-      <Stack.Screen name="LocationPermission" component={LocationPermissionScreen} />
-      <Stack.Screen name="Tabs" component={AppTabs} />
-      <Stack.Screen name="OneWay" component={OneWayScreen} />
-      <Stack.Screen name="Hourly" component={HourlyScreen} />
-      <Stack.Screen name="Outstation" component={OutstationScreen} />
-      <Stack.Screen name="DriverArriving" component={DriverArrivingScreen} />
-      <Stack.Screen name="Chat" component={ChatScreen} />
-      <Stack.Screen name="DriverLeaving" component={DriverLeavingScreen} />
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!locationGranted ? (
+        // Gate: shown only until permission is granted. Once granted, this
+        // screen is removed and the navigator auto-shows the app (Tabs).
+        <Stack.Screen name="LocationPermission" component={LocationPermissionScreen} />
+      ) : (
+        <>
+          <Stack.Screen name="Tabs" component={AppTabs} />
+          <Stack.Screen name="OneWay" component={OneWayScreen} />
+          <Stack.Screen name="Hourly" component={HourlyScreen} />
+          <Stack.Screen name="Outstation" component={OutstationScreen} />
+          <Stack.Screen name="DriverArriving" component={DriverArrivingScreen} />
+          <Stack.Screen name="Chat" component={ChatScreen} />
+          <Stack.Screen name="DriverLeaving" component={DriverLeavingScreen} />
+        </>
+      )}
     </Stack.Navigator>
   );
 }

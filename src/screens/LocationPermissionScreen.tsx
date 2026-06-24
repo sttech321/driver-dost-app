@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Alert, StyleSheet, Text, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '@/navigation/types';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -9,20 +9,27 @@ import { useLocation } from '@/hooks/useLocation';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'LocationPermission'>;
 
-export function LocationPermissionScreen({ navigation }: Props) {
-  const { setLocationGranted } = useAuth();
+export function LocationPermissionScreen(_props: Props) {
+  const { markLocationGranted } = useAuth();
   const { requestPermission } = useLocation();
   const [loading, setLoading] = useState(false);
 
   const onAgree = async () => {
     setLoading(true);
     try {
-      // Ask the OS for permission; continue regardless so the user isn't stuck.
-      await requestPermission();
+      const granted = await requestPermission();
+      if (granted) {
+        // Persist for this user → navigator auto-swaps to the app and we
+        // never ask again on future logins.
+        await markLocationGranted();
+      } else {
+        Alert.alert(
+          'Permission needed',
+          'Please allow location access to continue with easy booking.'
+        );
+      }
     } finally {
-      setLocationGranted(true);
       setLoading(false);
-      navigation.replace('Tabs', { screen: 'Home' });
     }
   };
 
