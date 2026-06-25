@@ -15,6 +15,9 @@ export const driverPortalApi = {
   async myBookings(): Promise<Booking[]> {
     return unwrap((await api.get('/driver/bookings')).data);
   },
+  async getBooking(id: string): Promise<Booking> {
+    return unwrap((await api.get(`/driver/bookings/${id}`)).data);
+  },
   async updateStatus(
     bookingId: string,
     status: Extract<BookingStatus, 'ARRIVING' | 'ONGOING' | 'COMPLETED' | 'CANCELLED'>

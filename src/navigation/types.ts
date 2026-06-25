@@ -38,6 +38,7 @@ export type DriverTabParamList = {
 export type DriverStackParamList = {
   DriverTabs: NavigatorScreenParams<DriverTabParamList>;
   Chat: ChatParams;
+  DriverTripDetail: { bookingId: string };
 };
 
 export type RootStackParamList = AppStackParamList & AuthStackParamList & DriverStackParamList;

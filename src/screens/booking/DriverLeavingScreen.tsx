@@ -6,6 +6,7 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Avatar, Button, Icon, MapPlaceholder, ScreenHeader, StarRating } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { bookingApi } from '@/api/booking.api';
+import { useRoute } from '@/hooks/useRoute';
 import { Booking, PaymentMethod } from '@/api/types';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'DriverLeaving'>;
@@ -68,6 +69,16 @@ export function DriverLeavingScreen({ navigation, route }: Props) {
     }
   };
 
+  const pickup =
+    booking?.pickupLat != null && booking?.pickupLng != null
+      ? { lat: booking.pickupLat, lng: booking.pickupLng }
+      : null;
+  const destination =
+    booking?.destinationLat != null && booking?.destinationLng != null
+      ? { lat: booking.destinationLat, lng: booking.destinationLng }
+      : null;
+  const mapRoute = useRoute(pickup, destination); // road-snapped
+
   if (!booking) {
     return (
       <View style={styles.loader}>
@@ -77,17 +88,17 @@ export function DriverLeavingScreen({ navigation, route }: Props) {
   }
 
   const driver = booking.driver;
+  const mapMarkers = [
+    ...(pickup ? [{ lat: pickup.lat, lng: pickup.lng, color: colors.primary }] : []),
+    ...(destination ? [{ lat: destination.lat, lng: destination.lng, color: colors.danger }] : []),
+  ];
+  const mapRegion = pickup
+    ? { latitude: pickup.lat, longitude: pickup.lng, latitudeDelta: 0.08, longitudeDelta: 0.08 }
+    : undefined;
 
   return (
     <View style={styles.root}>
-      <MapPlaceholder
-        style={styles.map}
-        markers={[{ lat: 30.705, lng: 76.69 }]}
-        route={[
-          { lat: 30.705, lng: 76.69 },
-          { lat: 30.71, lng: 76.74 },
-        ]}
-      />
+      <MapPlaceholder style={styles.map} region={mapRegion} markers={mapMarkers} route={mapRoute} />
       <SafeAreaView style={styles.headerOverlay} edges={['top']}>
         <ScreenHeader onBack={() => navigation.goBack()} title="Driver Leaving Screen" banner />
       </SafeAreaView>

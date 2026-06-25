@@ -9,6 +9,7 @@ import { bookingApi } from '@/api/booking.api';
 import { driverApi } from '@/api/driver.api';
 import { Booking } from '@/api/types';
 import { getSocket, joinBooking } from '@/realtime/socket';
+import { useRoute } from '@/hooks/useRoute';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'DriverArriving'>;
 
@@ -78,7 +79,7 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
     ...(pickup ? [{ lat: pickup.lat, lng: pickup.lng, color: colors.primary }] : []),
     ...(destination ? [{ lat: destination.lat, lng: destination.lng, color: colors.danger }] : []),
   ];
-  const mapRoute = pickup && destination ? [pickup, destination] : undefined;
+  const mapRoute = useRoute(pickup, destination); // road-snapped, falls back to straight
   const mapRegion =
     driverLocation ?? pickup
       ? {

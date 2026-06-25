@@ -11,6 +11,7 @@ import { bookingApi } from '@/api/booking.api';
 import { Place, SavedPlace } from '@/api/types';
 import { resolvePlace } from '@/utils/resolvePlace';
 import { formatSchedule } from '@/utils/formatSchedule';
+import { useRoute } from '@/hooks/useRoute';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'OneWay'>;
 
@@ -39,12 +40,11 @@ export function OneWayScreen({ navigation }: Props) {
     return pts;
   }, [pickupPlace, destPlace, coords]);
 
-  const route = pickupPlace && destPlace
-    ? [
-        { lat: pickupPlace.lat, lng: pickupPlace.lng },
-        { lat: destPlace.lat, lng: destPlace.lng },
-      ]
-    : undefined;
+  // Road-snapped route between the chosen pickup and destination.
+  const route = useRoute(
+    pickupPlace ? { lat: pickupPlace.lat, lng: pickupPlace.lng } : null,
+    destPlace ? { lat: destPlace.lat, lng: destPlace.lng } : null
+  );
 
   const selectSaved = (sp: SavedPlace) => {
     // Show the actual location (address / coords), not the saved nickname.
