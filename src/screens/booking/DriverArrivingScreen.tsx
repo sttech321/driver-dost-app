@@ -159,11 +159,14 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
         )}
 
         {driver && (
-          <View style={styles.driverCard}>
+          <Pressable
+            style={styles.driverCard}
+            onPress={() => navigation.navigate('DriverProfileView', { driverId: driver.id })}
+          >
             <Avatar uri={driver.photoUrl} />
             <View style={{ flex: 1 }}>
               <Text style={typography.h3}>{driver.name}</Text>
-              <Text style={typography.caption}>{driver.title}</Text>
+              <Text style={typography.caption}>{driver.title} · View profile</Text>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 4 }}>
               <View style={styles.ratingRow}>
@@ -174,7 +177,7 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
               </View>
               <Text style={styles.code}>{driver.code}</Text>
             </View>
-          </View>
+          </Pressable>
         )}
 
         <View style={styles.metaRow}>

@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { AppStackParamList } from '@/navigation/types';
 import { colors, radius, spacing, typography } from '@/theme';
-import { Avatar, Button, Icon, MapPlaceholder, ScreenHeader } from '@/components';
+import { Avatar, Button, Icon, MapPlaceholder, ScreenHeader, StarRating } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { bookingApi } from '@/api/booking.api';
 import { Booking, PaymentMethod } from '@/api/types';
@@ -23,9 +23,36 @@ export function DriverLeavingScreen({ navigation, route }: Props) {
   const [method, setMethod] = useState<PaymentMethod>('CREDIT_CARD');
   const [paying, setPaying] = useState(false);
 
+  // Review state
+  const [rating, setRating] = useState(0);
+  const [comment, setComment] = useState('');
+  const [submittingReview, setSubmittingReview] = useState(false);
+  const [reviewDone, setReviewDone] = useState(false);
+
   useEffect(() => {
     bookingApi.get(bookingId).then(setBooking).catch((e) => Alert.alert('Error', e.message));
   }, [bookingId]);
+
+  const submitReview = async () => {
+    if (rating < 1) {
+      Alert.alert('Add a rating', 'Please tap the stars to rate your driver.');
+      return;
+    }
+    setSubmittingReview(true);
+    try {
+      const { driver } = await bookingApi.review(bookingId, {
+        rating,
+        comment: comment.trim() || undefined,
+      });
+      // Reflect the driver's new aggregate rating immediately.
+      setBooking((b) => (b ? { ...b, driver: b.driver ? { ...b.driver, ...driver } : driver } : b));
+      setReviewDone(true);
+    } catch (e: any) {
+      Alert.alert('Could not submit review', e.message);
+    } finally {
+      setSubmittingReview(false);
+    }
+  };
 
   const pay = async () => {
     setPaying(true);
@@ -65,11 +92,19 @@ export function DriverLeavingScreen({ navigation, route }: Props) {
         <ScreenHeader onBack={() => navigation.goBack()} title="Driver Leaving Screen" banner />
       </SafeAreaView>
 
-      <View style={styles.sheet}>
+      <ScrollView
+        style={styles.sheet}
+        contentContainerStyle={styles.sheetContent}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.grabber} />
 
         <Text style={typography.h3}>Your Trip Details</Text>
-        <View style={styles.tripCard}>
+        <Pressable
+          style={styles.tripCard}
+          disabled={!driver}
+          onPress={() => driver && navigation.navigate('DriverProfileView', { driverId: driver.id })}
+        >
           <Avatar uri={driver?.photoUrl} />
           <View style={{ flex: 1 }}>
             <Text style={typography.h3}>{driver?.name ?? 'Driver'}</Text>
@@ -79,7 +114,7 @@ export function DriverLeavingScreen({ navigation, route }: Props) {
             <Text style={typography.caption}>Final cost</Text>
             <Text style={typography.h3}>Rs {Number(booking.amount).toFixed(2)}</Text>
           </View>
-        </View>
+        </Pressable>
 
         <Text style={[typography.h3, { marginTop: spacing.sm }]}>Payment Methods</Text>
         <Text style={typography.caption}>Card Details</Text>
@@ -100,15 +135,38 @@ export function DriverLeavingScreen({ navigation, route }: Props) {
         <Button title="Pay Now" onPress={pay} loading={paying} />
 
         <Text style={[typography.h2, { marginTop: spacing.lg }]}>How Was Your Chauffeur?</Text>
-        <View style={styles.stars}>
-          {[1, 2, 3, 4, 5].map((s) => (
-            <Icon key={s} name="star" size={26} color={s <= 4 ? colors.star : colors.divider} />
-          ))}
-        </View>
-        <Text style={[typography.bodyMuted, { marginBottom: spacing.xxl }]}>
-          Share quick feedback so we can keep matching you with great drivers.
-        </Text>
-      </View>
+
+        {reviewDone ? (
+          <View style={styles.reviewDone}>
+            <Icon name="check" size={20} color={colors.success} />
+            <Text style={[typography.body, { color: colors.success, flex: 1 }]}>
+              Thanks for your feedback! {driver?.name}’s rating is now{' '}
+              {driver ? Number(driver.rating).toFixed(1) : ''} ({driver?.ratingCount}).
+            </Text>
+          </View>
+        ) : (
+          <>
+            <View style={styles.stars}>
+              <StarRating value={rating} onChange={setRating} size={30} />
+            </View>
+            <TextInput
+              value={comment}
+              onChangeText={setComment}
+              placeholder="Add a comment (optional)…"
+              placeholderTextColor={colors.textMuted}
+              multiline
+              style={styles.commentBox}
+            />
+            <Button
+              title="Submit Review"
+              variant="outline"
+              loading={submittingReview}
+              onPress={submitReview}
+              style={{ marginBottom: spacing.xxl }}
+            />
+          </>
+        )}
+      </ScrollView>
     </View>
   );
 }
@@ -124,8 +182,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
+  },
+  sheetContent: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
+    paddingBottom: spacing.xl,
     gap: spacing.md,
   },
   grabber: { alignSelf: 'center', width: 56, height: 5, borderRadius: 3, backgroundColor: colors.divider },
@@ -151,5 +212,26 @@ const styles = StyleSheet.create({
   },
   radioOn: { borderColor: colors.primary },
   radioInner: { width: 11, height: 11, borderRadius: 6, backgroundColor: colors.primary },
-  stars: { flexDirection: 'row', gap: spacing.sm },
+  stars: { flexDirection: 'row', gap: spacing.sm, marginVertical: spacing.sm },
+  commentBox: {
+    ...typography.body,
+    minHeight: 72,
+    borderWidth: 1,
+    borderColor: colors.fieldBorder,
+    borderRadius: radius.lg,
+    backgroundColor: colors.field,
+    padding: spacing.md,
+    textAlignVertical: 'top',
+    marginBottom: spacing.md,
+  },
+  reviewDone: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    backgroundColor: colors.primarySofter,
+    borderRadius: radius.lg,
+    padding: spacing.lg,
+    marginVertical: spacing.md,
+    marginBottom: spacing.xxl,
+  },
 });

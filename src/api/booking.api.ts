@@ -1,5 +1,5 @@
 import { api, unwrap } from './client';
-import { Booking, ChatMessage, OutstationTripType, PaymentMethod } from './types';
+import { Booking, ChatMessage, Driver, OutstationTripType, PaymentMethod, Review } from './types';
 
 interface PlaceInput {
   pickupLabel?: string;
@@ -40,6 +40,12 @@ export const bookingApi = {
   },
   async pay(id: string, paymentMethod: PaymentMethod): Promise<Booking> {
     return unwrap((await api.post(`/bookings/${id}/pay`, { paymentMethod })).data);
+  },
+  async review(
+    id: string,
+    body: { rating: number; comment?: string }
+  ): Promise<{ review: Review; driver: Driver }> {
+    return unwrap((await api.post(`/bookings/${id}/review`, body)).data);
   },
 
   async listMessages(bookingId: string): Promise<ChatMessage[]> {

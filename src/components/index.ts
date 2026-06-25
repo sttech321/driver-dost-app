@@ -16,3 +16,4 @@ export { HourRangeSlider } from './HourRangeSlider';
 export { GoogleSignInButton } from './GoogleSignInButton';
 export { SchedulePicker } from './SchedulePicker';
 export { LocationPickerModal } from './LocationPickerModal';
+export { StarRating } from './StarRating';

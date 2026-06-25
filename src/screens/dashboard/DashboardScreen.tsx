@@ -117,7 +117,11 @@ export function DashboardScreen() {
           ItemSeparatorComponent={() => <View style={{ width: spacing.md }} />}
           renderItem={({ item, index }) => (
             <View style={{ opacity: 1 - Math.min(index * 0.12, 0.5) }}>
-              <DriverCard driver={item} compact onPress={() => navigation.navigate('OneWay')} />
+              <DriverCard
+                driver={item}
+                compact
+                onPress={() => navigation.navigate('DriverProfileView', { driverId: item.id })}
+              />
             </View>
           )}
           ListEmptyComponent={<Text style={typography.caption}>No drivers nearby right now.</Text>}

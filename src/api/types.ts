@@ -90,6 +90,14 @@ export interface ChatMessage {
   createdAt: string;
 }
 
+export interface Review {
+  id: string;
+  rating: number;
+  comment: string | null;
+  createdAt: string;
+  user?: { id?: string; name: string | null } | null;
+}
+
 export interface LatLng {
   lat: number;
   lng: number;

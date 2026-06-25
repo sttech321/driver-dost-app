@@ -1,5 +1,5 @@
 import { api, unwrap } from './client';
-import { Driver } from './types';
+import { Driver, Review } from './types';
 
 export const driverApi = {
   async recommended(params?: { lat?: number; lng?: number; limit?: number }): Promise<Driver[]> {
@@ -10,5 +10,8 @@ export const driverApi = {
   },
   async nearbyCount(params: { lat?: number; lng?: number }): Promise<{ count: number }> {
     return unwrap((await api.get('/drivers/nearby-count', { params })).data);
+  },
+  async reviews(id: string): Promise<{ driver: Driver; reviews: Review[] }> {
+    return unwrap((await api.get(`/drivers/${id}/reviews`)).data);
   },
 };
