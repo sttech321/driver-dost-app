@@ -8,4 +8,7 @@ export const driverApi = {
   async getById(id: string): Promise<Driver> {
     return unwrap((await api.get(`/drivers/${id}`)).data);
   },
+  async nearbyCount(params: { lat?: number; lng?: number }): Promise<{ count: number }> {
+    return unwrap((await api.get('/drivers/nearby-count', { params })).data);
+  },
 };

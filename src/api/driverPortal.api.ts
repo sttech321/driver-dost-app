@@ -6,8 +6,8 @@ export const driverPortalApi = {
   async me(): Promise<Driver> {
     return unwrap((await api.get('/driver/me')).data);
   },
-  async requests(): Promise<Booking[]> {
-    return unwrap((await api.get('/driver/requests')).data);
+  async requests(params?: { lat?: number; lng?: number }): Promise<Booking[]> {
+    return unwrap((await api.get('/driver/requests', { params })).data);
   },
   async accept(bookingId: string): Promise<Booking> {
     return unwrap((await api.post(`/driver/requests/${bookingId}/accept`)).data);

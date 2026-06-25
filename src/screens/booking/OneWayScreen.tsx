@@ -47,9 +47,13 @@ export function OneWayScreen({ navigation }: Props) {
     : undefined;
 
   const selectSaved = (sp: SavedPlace) => {
-    setDestination(sp.label);
+    // Show the actual location (address / coords), not the saved nickname.
+    const locationText =
+      sp.addressLine ||
+      (sp.lat != null && sp.lng != null ? `${sp.lat.toFixed(5)}, ${sp.lng.toFixed(5)}` : sp.label);
+    setDestination(locationText);
     if (sp.lat != null && sp.lng != null) {
-      setDestPlace({ id: sp.id, label: sp.label, address: sp.addressLine, lat: sp.lat, lng: sp.lng });
+      setDestPlace({ id: sp.id, label: sp.addressLine || sp.label, address: sp.addressLine, lat: sp.lat, lng: sp.lng });
     }
   };
 
