@@ -60,8 +60,12 @@ export interface Booking {
   status: BookingStatus;
   pickupLabel: string | null;
   pickupAddress: string | null;
+  pickupLat: number | null;
+  pickupLng: number | null;
   destinationLabel: string | null;
   destinationAddress: string | null;
+  destinationLat: number | null;
+  destinationLng: number | null;
   scheduledAt: string | null;
   startHour: number | null;
   endHour: number | null;

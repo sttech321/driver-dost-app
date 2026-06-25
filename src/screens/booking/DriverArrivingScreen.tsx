@@ -14,9 +14,10 @@ type Props = NativeStackScreenProps<AppStackParamList, 'DriverArriving'>;
 export function DriverArrivingScreen({ navigation, route }: Props) {
   const { bookingId } = route.params;
   const [booking, setBooking] = useState<Booking | null>(null);
+  const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
 
-  // Realtime: a driver accepting / updating status pushes here instantly.
-  // A slow poll stays as a fallback if the socket dropped.
+  // Realtime: a driver accepting / updating status pushes here instantly, and
+  // the driver's live GPS streams in via 'driver:location'.
   useEffect(() => {
     let active = true;
     const fetchOnce = async () => {
@@ -34,20 +35,49 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
     const onUpdate = (b: Booking) => {
       if (active && b?.id === bookingId) setBooking(b);
     };
+    const onLocation = (loc: { lat: number; lng: number }) => {
+      if (active && loc) setDriverLocation({ lat: loc.lat, lng: loc.lng });
+    };
     socket?.on('booking:accepted', onUpdate);
     socket?.on('booking:status', onUpdate);
+    socket?.on('driver:location', onLocation);
 
     const t = setInterval(fetchOnce, 20000);
     return () => {
       active = false;
       socket?.off('booking:accepted', onUpdate);
       socket?.off('booking:status', onUpdate);
+      socket?.off('driver:location', onLocation);
       clearInterval(t);
     };
   }, [bookingId]);
 
   const driver = booking?.driver;
   const waiting = !driver;
+
+  // Build map data from the real booking coordinates.
+  const pickup =
+    booking?.pickupLat != null && booking?.pickupLng != null
+      ? { lat: booking.pickupLat, lng: booking.pickupLng }
+      : null;
+  const destination =
+    booking?.destinationLat != null && booking?.destinationLng != null
+      ? { lat: booking.destinationLat, lng: booking.destinationLng }
+      : null;
+  const mapMarkers = [
+    ...(pickup ? [{ lat: pickup.lat, lng: pickup.lng, color: colors.primary }] : []),
+    ...(destination ? [{ lat: destination.lat, lng: destination.lng, color: colors.danger }] : []),
+  ];
+  const mapRoute = pickup && destination ? [pickup, destination] : undefined;
+  const mapRegion =
+    driverLocation ?? pickup
+      ? {
+          latitude: (driverLocation ?? pickup)!.lat,
+          longitude: (driverLocation ?? pickup)!.lng,
+          latitudeDelta: 0.05,
+          longitudeDelta: 0.05,
+        }
+      : undefined;
 
   const callDriver = () => {
     if (driver?.phone) Linking.openURL(`tel:${driver.phone}`);
@@ -75,15 +105,10 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
     <View style={styles.root}>
       <MapPlaceholder
         style={styles.map}
-        markers={[
-          { lat: 30.705, lng: 76.69 },
-          { lat: 30.69, lng: 76.72 },
-        ]}
-        route={[
-          { lat: 30.705, lng: 76.69 },
-          { lat: 30.698, lng: 76.705 },
-          { lat: 30.69, lng: 76.72 },
-        ]}
+        region={mapRegion}
+        markers={mapMarkers}
+        route={mapRoute}
+        driverLocation={driverLocation}
       />
       <SafeAreaView style={styles.headerOverlay} edges={['top']}>
         <ScreenHeader onBack={() => navigation.goBack()} title="Driver Arriving Screen" banner />

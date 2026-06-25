@@ -1,9 +1,10 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { Alert, FlatList, Linking, Pressable, StyleSheet, Text, View } from 'react-native';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { Alert, FlatList, Linking, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import * as Location from 'expo-location';
 import { DriverStackParamList, DriverTabParamList } from '@/navigation/types';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Screen, Icon, Button } from '@/components';
@@ -23,6 +24,9 @@ const NEXT: Partial<Record<BookingStatus, { status: BookingStatus; label: string
   ONGOING: { status: 'COMPLETED', label: 'Complete trip' },
 };
 
+// Rides for which the rider should see the driver's live location.
+const TRACKABLE: BookingStatus[] = ['ACCEPTED', 'ARRIVING', 'ONGOING'];
+
 const STATUS_COLOR: Record<string, string> = {
   COMPLETED: colors.success,
   CANCELLED: colors.danger,
@@ -33,6 +37,12 @@ export function DriverTripsScreen() {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
 
+  // Latest set of active booking ids — read inside the GPS watcher.
+  const activeIds = useRef<string[]>([]);
+  useEffect(() => {
+    activeIds.current = bookings.filter((b) => TRACKABLE.includes(b.status)).map((b) => b.id);
+  }, [bookings]);
+
   const load = useCallback(async () => {
     try {
       setBookings(await driverPortalApi.myBookings());
@@ -40,6 +50,56 @@ export function DriverTripsScreen() {
       /* ignore */
     }
   }, []);
+
+  // Stream the driver's GPS to the rider while on the Trips tab (active rides).
+  // Web uses the browser geolocation API directly (expo-location's watch
+  // subscription cleanup is broken on web); native uses expo-location.
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      let cleanup = () => {};
+
+      const emit = (lat: number, lng: number) => {
+        const socket = getSocket();
+        if (!socket) return;
+        activeIds.current.forEach((bookingId) =>
+          socket.emit('driver:location', { bookingId, lat, lng })
+        );
+      };
+
+      (async () => {
+        if (Platform.OS === 'web') {
+          const geo = typeof navigator !== 'undefined' ? navigator.geolocation : undefined;
+          if (!geo) return;
+          const id = geo.watchPosition(
+            (pos) => emit(pos.coords.latitude, pos.coords.longitude),
+            () => {},
+            { enableHighAccuracy: false, maximumAge: 4000, timeout: 15000 }
+          );
+          if (cancelled) geo.clearWatch(id);
+          else cleanup = () => geo.clearWatch(id);
+        } else {
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted' || cancelled) return;
+          const sub = await Location.watchPositionAsync(
+            { accuracy: Location.Accuracy.Balanced, timeInterval: 4000, distanceInterval: 10 },
+            (pos) => emit(pos.coords.latitude, pos.coords.longitude)
+          );
+          if (cancelled) sub.remove();
+          else cleanup = () => sub.remove();
+        }
+      })();
+
+      return () => {
+        cancelled = true;
+        try {
+          cleanup();
+        } catch {
+          /* ignore */
+        }
+      };
+    }, [])
+  );
 
   // Realtime: refresh when a ride's status changes (e.g. rider cancels).
   // Stays mounted-scoped (cheap, push-only) — no background polling.

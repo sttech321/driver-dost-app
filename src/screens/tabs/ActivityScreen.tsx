@@ -1,10 +1,21 @@
 import React, { useCallback, useState } from 'react';
-import { FlatList, RefreshControl, StyleSheet, Text, View } from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
+import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'react-native';
+import { useFocusEffect, useNavigation, CompositeNavigationProp } from '@react-navigation/native';
+import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
+import { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { AppStackParamList, TabParamList } from '@/navigation/types';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Screen, Icon, IconName } from '@/components';
 import { bookingApi } from '@/api/booking.api';
-import { Booking, BookingType } from '@/api/types';
+import { Booking, BookingType, BookingStatus } from '@/api/types';
+
+type Nav = CompositeNavigationProp<
+  BottomTabNavigationProp<TabParamList, 'Activity'>,
+  NativeStackNavigationProp<AppStackParamList>
+>;
+
+// Active rides → live "driver coming" screen; finished rides → payment/receipt.
+const ACTIVE: BookingStatus[] = ['REQUESTED', 'ACCEPTED', 'ARRIVING', 'ONGOING'];
 
 const TYPE_META: Record<BookingType, { label: string; icon: IconName }> = {
   ONE_WAY: { label: 'One Way', icon: 'arrow-up' },
@@ -19,8 +30,18 @@ const STATUS_COLOR: Record<string, string> = {
 };
 
 export function ActivityScreen() {
+  const navigation = useNavigation<Nav>();
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+
+  const openBooking = (b: Booking) => {
+    if (ACTIVE.includes(b.status)) {
+      navigation.navigate('DriverArriving', { bookingId: b.id });
+    } else if (b.status === 'COMPLETED') {
+      navigation.navigate('DriverLeaving', { bookingId: b.id });
+    }
+    // CANCELLED → not navigable
+  };
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -53,8 +74,13 @@ export function ActivityScreen() {
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item }) => {
           const meta = TYPE_META[item.type];
+          const tappable = item.status !== 'CANCELLED';
           return (
-            <View style={styles.card}>
+            <Pressable
+              style={({ pressed }) => [styles.card, pressed && tappable && styles.cardPressed]}
+              onPress={() => openBooking(item)}
+              disabled={!tappable}
+            >
               <View style={styles.iconTile}>
                 <Icon name={meta.icon} size={22} color={colors.primary} />
               </View>
@@ -71,7 +97,8 @@ export function ActivityScreen() {
                   {item.status}
                 </Text>
               </View>
-            </View>
+              {tappable && <Icon name="chevron-right" size={20} color={colors.textMuted} />}
+            </Pressable>
           );
         }}
         ListEmptyComponent={
@@ -100,6 +127,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     padding: spacing.md,
   },
+  cardPressed: { opacity: 0.7 },
   iconTile: {
     width: 44,
     height: 44,
