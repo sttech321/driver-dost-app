@@ -98,6 +98,29 @@ export interface Review {
   user?: { id?: string; name: string | null } | null;
 }
 
+export type NotificationType =
+  | 'BOOKING_ACCEPTED'
+  | 'DRIVER_ARRIVING'
+  | 'RIDE_STARTED'
+  | 'RIDE_COMPLETED'
+  | 'RIDE_CANCELLED'
+  | 'PAYMENT_SUCCESS'
+  | 'WALLET_CREDITED'
+  | 'CHAT_MESSAGE'
+  | 'NEW_REQUEST'
+  | 'PROMO'
+  | 'GENERAL';
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data: { bookingId?: string; [key: string]: any } | null;
+  isRead: boolean;
+  createdAt: string;
+}
+
 export interface LatLng {
   lat: number;
   lng: number;

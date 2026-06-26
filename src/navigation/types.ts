@@ -27,6 +27,7 @@ export type AppStackParamList = {
   Chat: ChatParams;
   DriverLeaving: { bookingId: string };
   DriverProfileView: { driverId: string };
+  Notifications: undefined;
 };
 
 export type DriverTabParamList = {

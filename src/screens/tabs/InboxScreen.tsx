@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import { FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
@@ -9,6 +9,7 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Screen, Avatar, Icon } from '@/components';
 import { bookingApi } from '@/api/booking.api';
 import { Booking } from '@/api/types';
+import { useNotifications } from '@/context/NotificationContext';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<TabParamList, 'Inbox'>,
@@ -17,7 +18,19 @@ type Nav = CompositeNavigationProp<
 
 export function InboxScreen() {
   const navigation = useNavigation<Nav>();
+  const { items } = useNotifications();
   const [chats, setChats] = useState<Booking[]>([]);
+
+  // Unread chat-message count per booking → per-thread "new message" badge.
+  const unreadByBooking = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const n of items) {
+      if (n.type === 'CHAT_MESSAGE' && !n.isRead && n.data?.bookingId) {
+        map[n.data.bookingId] = (map[n.data.bookingId] || 0) + 1;
+      }
+    }
+    return map;
+  }, [items]);
 
   const load = useCallback(async () => {
     try {
@@ -46,26 +59,39 @@ export function InboxScreen() {
         keyExtractor={(b) => b.id}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={styles.sep} />}
-        renderItem={({ item }) => (
-          <Pressable
-            style={styles.row}
-            onPress={() =>
-              navigation.navigate('Chat', {
-                bookingId: item.id,
-                peerName: item.driver?.name ?? 'Driver',
-              })
-            }
-          >
-            <Avatar uri={item.driver?.photoUrl} size={52} />
-            <View style={{ flex: 1 }}>
-              <Text style={typography.title}>{item.driver?.name}</Text>
-              <Text style={typography.caption} numberOfLines={1}>
-                {item.driver?.title} · {item.status}
-              </Text>
-            </View>
-            <Icon name="message-square" size={20} color={colors.primary} />
-          </Pressable>
-        )}
+        renderItem={({ item }) => {
+          const unread = unreadByBooking[item.id] || 0;
+          return (
+            <Pressable
+              style={styles.row}
+              onPress={() =>
+                navigation.navigate('Chat', {
+                  bookingId: item.id,
+                  peerName: item.driver?.name ?? 'Driver',
+                })
+              }
+            >
+              <Avatar uri={item.driver?.photoUrl} size={52} />
+              <View style={{ flex: 1 }}>
+                <Text style={typography.title}>{item.driver?.name}</Text>
+                <Text
+                  style={[typography.caption, unread > 0 && styles.newMsg]}
+                  numberOfLines={1}
+                >
+                  {unread > 0 ? `${unread} new message${unread > 1 ? 's' : ''}` : `${item.driver?.title} · ${item.status}`}
+                </Text>
+              </View>
+              <View style={styles.iconWrap}>
+                <Icon name="message-square" size={20} color={unread > 0 ? colors.primary : colors.textMuted} />
+                {unread > 0 && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+                  </View>
+                )}
+              </View>
+            </Pressable>
+          );
+        }}
         ListEmptyComponent={
           <View style={styles.empty}>
             <Icon name="message-square" size={40} color={colors.textMuted} />
@@ -85,4 +111,19 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: spacing.md, paddingVertical: spacing.sm },
   sep: { height: 1, backgroundColor: colors.divider },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  newMsg: { color: colors.primary, fontWeight: '700' },
+  iconWrap: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
+  badge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: colors.white, fontSize: 9, fontWeight: '700' },
 });

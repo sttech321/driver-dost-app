@@ -7,6 +7,7 @@ import { DashboardScreen } from '@/screens/dashboard/DashboardScreen';
 import { ActivityScreen } from '@/screens/tabs/ActivityScreen';
 import { InboxScreen } from '@/screens/tabs/InboxScreen';
 import { ProfileScreen } from '@/screens/tabs/ProfileScreen';
+import { useNotifications } from '@/context/NotificationContext';
 
 const Tab = createBottomTabNavigator<TabParamList>();
 
@@ -18,6 +19,8 @@ const ICONS: Record<keyof TabParamList, IconName> = {
 };
 
 export function AppTabs() {
+  const { unreadChats } = useNotifications();
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
@@ -33,7 +36,11 @@ export function AppTabs() {
     >
       <Tab.Screen name="Home" component={DashboardScreen} />
       <Tab.Screen name="Activity" component={ActivityScreen} />
-      <Tab.Screen name="Inbox" component={InboxScreen} />
+      <Tab.Screen
+        name="Inbox"
+        component={InboxScreen}
+        options={{ tabBarBadge: unreadChats > 0 ? (unreadChats > 9 ? '9+' : unreadChats) : undefined }}
+      />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>
   );

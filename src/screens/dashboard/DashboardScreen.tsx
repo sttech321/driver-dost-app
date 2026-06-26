@@ -10,6 +10,7 @@ import { Screen, Icon, IconName, DriverCard, Avatar, LocationPickerModal } from 
 import { driverApi } from '@/api/driver.api';
 import { Driver } from '@/api/types';
 import { useAppLocation } from '@/context/LocationContext';
+import { useNotifications } from '@/context/NotificationContext';
 
 type Nav = CompositeNavigationProp<
   BottomTabNavigationProp<TabParamList, 'Home'>,
@@ -26,6 +27,7 @@ const QUICK_ACTIONS: { key: string; label: string; icon: IconName; route: keyof 
 export function DashboardScreen() {
   const navigation = useNavigation<Nav>();
   const { location } = useAppLocation();
+  const { unread } = useNotifications();
   const [drivers, setDrivers] = useState<Driver[]>([]);
   const [showLocationPicker, setShowLocationPicker] = useState(false);
 
@@ -66,8 +68,13 @@ export function DashboardScreen() {
               <Icon name="chevron-down" size={18} color={colors.primary} />
             </Pressable>
           </View>
-          <Pressable style={styles.bell}>
+          <Pressable style={styles.bell} onPress={() => navigation.navigate('Notifications')}>
             <Icon name="bell" size={22} color={colors.white} />
+            {unread > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{unread > 9 ? '9+' : unread}</Text>
+              </View>
+            )}
           </Pressable>
         </View>
 
@@ -163,6 +170,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  badge: {
+    position: 'absolute',
+    top: 4,
+    right: 4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    backgroundColor: colors.danger,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  badgeText: { color: colors.white, fontSize: 10, fontWeight: '700' },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
