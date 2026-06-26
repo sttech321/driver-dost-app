@@ -1,6 +1,13 @@
 import { api, unwrap } from './client';
 import { Booking, ChatMessage, Driver, OutstationTripType, PaymentMethod, Review } from './types';
 
+export interface PayResult {
+  booking: Booking;
+  needsCheckout?: boolean;
+  mock?: boolean;
+  order?: { id: string; amount: number; currency: string; keyId: string };
+}
+
 interface PlaceInput {
   pickupLabel?: string;
   pickupAddress?: string;
@@ -38,8 +45,14 @@ export const bookingApi = {
   async cancel(id: string): Promise<Booking> {
     return unwrap((await api.post(`/bookings/${id}/cancel`)).data);
   },
-  async pay(id: string, paymentMethod: PaymentMethod): Promise<Booking> {
+  async pay(id: string, paymentMethod: PaymentMethod): Promise<PayResult> {
     return unwrap((await api.post(`/bookings/${id}/pay`, { paymentMethod })).data);
+  },
+  async verifyPayment(
+    id: string,
+    body: { orderId: string; paymentId: string; signature: string }
+  ): Promise<{ booking: Booking }> {
+    return unwrap((await api.post(`/bookings/${id}/pay/verify`, body)).data);
   },
   async review(
     id: string,

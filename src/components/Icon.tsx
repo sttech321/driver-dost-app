@@ -28,6 +28,7 @@ const FEATHER = {
   calendar: 'calendar',
   crosshair: 'crosshair',
   check: 'check',
+  'alert-circle': 'alert-circle',
   'log-out': 'log-out',
   trash: 'trash-2',
   plus: 'plus',

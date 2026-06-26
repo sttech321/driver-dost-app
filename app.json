@@ -18,7 +18,8 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.driverdost.app",
       "infoPlist": {
-        "NSLocationWhenInUseUsageDescription": "We need your location to pin-point your pickup for easy booking."
+        "NSLocationWhenInUseUsageDescription": "We need your location to pin-point your pickup for easy booking.",
+        "LSApplicationQueriesSchemes": ["tez", "phonepe", "paytmmp", "credpay", "bhim"]
       },
       "config": {
         "googleMapsApiKey": "REPLACE_WITH_IOS_GOOGLE_MAPS_API_KEY"

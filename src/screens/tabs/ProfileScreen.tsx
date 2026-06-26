@@ -2,7 +2,7 @@ import React, { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, radius, spacing, typography } from '@/theme';
-import { Screen, Avatar, Icon, Button, TextField, PlaceAutocomplete } from '@/components';
+import { Screen, Avatar, Icon, Button, TextField, PlaceAutocomplete, AddMoneyModal } from '@/components';
 import { useAuth } from '@/context/AuthContext';
 import { useAppLocation } from '@/context/LocationContext';
 import { userApi } from '@/api/user.api';
@@ -10,13 +10,14 @@ import { Place, SavedPlace } from '@/api/types';
 import { resolvePlace } from '@/utils/resolvePlace';
 
 export function ProfileScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUser } = useAuth();
   const { location } = useAppLocation();
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [label, setLabel] = useState('');
   const [address, setAddress] = useState('');
   const [addressPlace, setAddressPlace] = useState<Place | null>(null);
   const [saving, setSaving] = useState(false);
+  const [addMoneyOpen, setAddMoneyOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -87,6 +88,10 @@ export function ProfileScreen() {
         <View style={styles.wallet}>
           <Text style={typography.caption}>Wallet Balance</Text>
           <Text style={typography.h3}>Rs {Number(user?.walletBalance ?? 0).toFixed(2)}</Text>
+          <Pressable style={styles.addMoneyBtn} onPress={() => setAddMoneyOpen(true)}>
+            <Icon name="plus" size={16} color={colors.white} />
+            <Text style={styles.addMoneyText}>Add Money</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -139,6 +144,12 @@ export function ProfileScreen() {
         onPress={signOut}
         style={{ marginTop: spacing.lg, marginBottom: spacing.xxl }}
       />
+
+      <AddMoneyModal
+        visible={addMoneyOpen}
+        onClose={() => setAddMoneyOpen(false)}
+        onToppedUp={refreshUser}
+      />
     </Screen>
   );
 }
@@ -152,8 +163,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xxl,
     alignItems: 'center',
-    gap: 2,
+    gap: spacing.sm,
   },
+  addMoneyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  addMoneyText: { ...typography.label, color: colors.white },
   placeRow: {
     flexDirection: 'row',
     alignItems: 'center',
