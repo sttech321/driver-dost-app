@@ -1,15 +1,29 @@
 // Razorpay Checkout for native (iOS / Android) via the react-native-razorpay SDK.
 // Same signature as razorpay.ts (web) — Metro picks this file on device.
 //
-// IMPORTANT: this is a native module, so it requires a dev build:
+// IMPORTANT: react-native-razorpay is a NATIVE module. It is loaded LAZILY (require
+// inside the function) so that Expo Go — which doesn't bundle the native side —
+// doesn't crash at app startup (the SDK runs `new NativeEventEmitter(...)` at module
+// load, which throws when the native module is absent). Card/UPI need a dev build:
 //   npx expo prebuild && npx expo run:android   (or run:ios)
-// It does NOT work in Expo Go.
-import RazorpayCheckout from 'react-native-razorpay';
 import { RazorpayCheckoutOpts, RazorpayError, RazorpayResult } from './razorpayTypes';
+
+/** Load the SDK on demand; returns null if the native module isn't present (Expo Go). */
+function getRazorpayCheckout(): { open: (opts: any) => Promise<any> } | null {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    const mod = require('react-native-razorpay');
+    const Checkout = mod?.default ?? mod;
+    return Checkout && typeof Checkout.open === 'function' ? Checkout : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Opens the native Razorpay checkout; resolves with the verification payload on success. */
 export async function openRazorpayCheckout(opts: RazorpayCheckoutOpts): Promise<RazorpayResult> {
-  if (!RazorpayCheckout || typeof RazorpayCheckout.open !== 'function') {
+  const RazorpayCheckout = getRazorpayCheckout();
+  if (!RazorpayCheckout) {
     throw new RazorpayError(
       'Razorpay is not available in this build. Card/UPI need a dev build — run ' +
         '"npx expo prebuild" then "npx expo run:android" (or run:ios). It does not work in Expo Go.'
