@@ -31,8 +31,10 @@ export type AppStackParamList = {
 };
 
 export type DriverTabParamList = {
+  Overview: undefined;
   Requests: undefined;
   Trips: undefined;
+  DriverInbox: undefined;
   DriverProfile: undefined;
 };
 
@@ -40,6 +42,7 @@ export type DriverStackParamList = {
   DriverTabs: NavigatorScreenParams<DriverTabParamList>;
   Chat: ChatParams;
   DriverTripDetail: { bookingId: string };
+  Notifications: undefined;
 };
 
 export type RootStackParamList = AppStackParamList & AuthStackParamList & DriverStackParamList;

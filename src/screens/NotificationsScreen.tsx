@@ -3,13 +3,15 @@ import { FlatList, Pressable, RefreshControl, StyleSheet, Text, View } from 'rea
 import { useNavigation } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { AppStackParamList } from '@/navigation/types';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Icon, IconName, ScreenHeader } from '@/components';
 import { useNotifications } from '@/context/NotificationContext';
+import { useAuth } from '@/context/AuthContext';
 import { AppNotification, NotificationType } from '@/api/types';
 
-type Nav = NativeStackNavigationProp<AppStackParamList>;
+// Shared between the rider (AppStack) and driver (DriverStack) navigators, so the
+// navigation target is resolved per-role rather than against a single param list.
+type Nav = NativeStackNavigationProp<any>;
 
 const ICON: Record<NotificationType, IconName> = {
   BOOKING_ACCEPTED: 'check',
@@ -25,10 +27,20 @@ const ICON: Record<NotificationType, IconName> = {
   GENERAL: 'bell',
 };
 
-// Where tapping a notification should take the user (null = just mark read).
-function destination(n: AppNotification): { screen: keyof AppStackParamList; params: any } | null {
+// Where tapping a notification routes — resolved per role so we only ever target
+// a route that actually exists in the current navigator (null = just mark read).
+function destination(n: AppNotification, isDriver: boolean): { screen: string; params: any } | null {
   const bookingId = n.data?.bookingId;
   if (!bookingId) return null;
+
+  if (isDriver) {
+    // Drivers only ever receive CHAT_MESSAGE → open the chat thread (driver side).
+    if (n.type === 'CHAT_MESSAGE') {
+      return { screen: 'Chat', params: { bookingId, peerName: 'Rider', asDriver: true } };
+    }
+    return null;
+  }
+
   switch (n.type) {
     case 'BOOKING_ACCEPTED':
     case 'DRIVER_ARRIVING':
@@ -56,12 +68,14 @@ function timeAgo(iso: string): string {
 
 export function NotificationsScreen() {
   const navigation = useNavigation<Nav>();
+  const { user } = useAuth();
   const { items, loading, unread, refresh, markRead, markAllRead } = useNotifications();
+  const isDriver = user?.role === 'DRIVER';
 
   const onPressItem = (n: AppNotification) => {
     if (!n.isRead) markRead(n.id);
-    const dest = destination(n);
-    if (dest) navigation.navigate(dest.screen as any, dest.params);
+    const dest = destination(n, isDriver);
+    if (dest) navigation.navigate(dest.screen, dest.params);
   };
 
   return (

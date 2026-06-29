@@ -33,6 +33,7 @@ export interface Driver {
   lat: number | null;
   lng: number | null;
   distanceKm?: number | null;
+  createdAt?: string;
 }
 
 export interface SavedPlace {

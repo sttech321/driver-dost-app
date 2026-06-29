@@ -27,8 +27,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   const [loading, setLoading] = useState(false);
 
   const refresh = useCallback(async () => {
-    // Rider-only feature (drivers have no notifications UI in Phase 1).
-    if (!user || user.role !== 'USER') return;
+    if (!user) return;
     setLoading(true);
     try {
       const [list, count] = await Promise.all([
@@ -57,7 +56,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
   // Live updates via the app socket. The socket may connect slightly after login,
   // so retry attaching (capped) until it's available.
   useEffect(() => {
-    if (!user || user.role !== 'USER') return;
+    if (!user) return;
     let socket: ReturnType<typeof getSocket> = null;
     let interval: ReturnType<typeof setInterval> | null = null;
     let attempts = 0;
@@ -107,7 +106,7 @@ export function NotificationProvider({ children }: { children: React.ReactNode }
 
   // Re-sync when the app returns to the foreground (covers backgrounded gaps).
   useEffect(() => {
-    if (!user || user.role !== 'USER') return;
+    if (!user) return;
     const sub = AppState.addEventListener('change', (state) => {
       if (state === 'active') refresh();
     });
