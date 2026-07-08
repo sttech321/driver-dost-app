@@ -6,8 +6,10 @@ import { colors, radius, spacing, typography } from '@/theme';
 import { Avatar, Icon, MapPlaceholder, ScreenHeader } from '@/components';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { bookingApi } from '@/api/booking.api';
+import { driverApi } from '@/api/driver.api';
 import { Booking } from '@/api/types';
 import { getSocket, joinBooking } from '@/realtime/socket';
+import { useRoute } from '@/hooks/useRoute';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'DriverArriving'>;
 
@@ -15,6 +17,7 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
   const { bookingId } = route.params;
   const [booking, setBooking] = useState<Booking | null>(null);
   const [driverLocation, setDriverLocation] = useState<{ lat: number; lng: number } | null>(null);
+  const [nearbyDrivers, setNearbyDrivers] = useState<number | null>(null);
 
   // Realtime: a driver accepting / updating status pushes here instantly, and
   // the driver's live GPS streams in via 'driver:location'.
@@ -23,7 +26,15 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
     const fetchOnce = async () => {
       try {
         const b = await bookingApi.get(bookingId);
-        if (active) setBooking(b);
+        if (!active) return;
+        setBooking(b);
+        // While waiting, show how many drivers are nearby to pick up.
+        if (b.status === 'REQUESTED' && b.pickupLat != null && b.pickupLng != null) {
+          driverApi
+            .nearbyCount({ lat: b.pickupLat, lng: b.pickupLng })
+            .then((r) => active && setNearbyDrivers(r.count))
+            .catch(() => {});
+        }
       } catch {
         /* keep trying */
       }
@@ -68,7 +79,7 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
     ...(pickup ? [{ lat: pickup.lat, lng: pickup.lng, color: colors.primary }] : []),
     ...(destination ? [{ lat: destination.lat, lng: destination.lng, color: colors.danger }] : []),
   ];
-  const mapRoute = pickup && destination ? [pickup, destination] : undefined;
+  const mapRoute = useRoute(pickup, destination); // road-snapped, falls back to straight
   const mapRegion =
     driverLocation ?? pickup
       ? {
@@ -135,19 +146,28 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
 
         {waiting && (
           <View style={styles.waitingCard}>
+            {nearbyDrivers != null && (
+              <Text style={styles.nearbyText}>
+                🚗 {nearbyDrivers} driver{nearbyDrivers === 1 ? '' : 's'} nearby{' '}
+                {nearbyDrivers === 1 ? 'is' : 'are'} seeing your request
+              </Text>
+            )}
             <Text style={typography.bodyMuted}>
-              We’ve sent your request to nearby drivers. This screen updates
+              We’ve sent your request to drivers within range. This screen updates
               automatically when a driver accepts.
             </Text>
           </View>
         )}
 
         {driver && (
-          <View style={styles.driverCard}>
+          <Pressable
+            style={styles.driverCard}
+            onPress={() => navigation.navigate('DriverProfileView', { driverId: driver.id })}
+          >
             <Avatar uri={driver.photoUrl} />
             <View style={{ flex: 1 }}>
               <Text style={typography.h3}>{driver.name}</Text>
-              <Text style={typography.caption}>{driver.title}</Text>
+              <Text style={typography.caption}>{driver.title} · View profile</Text>
             </View>
             <View style={{ alignItems: 'flex-end', gap: 4 }}>
               <View style={styles.ratingRow}>
@@ -158,7 +178,7 @@ export function DriverArrivingScreen({ navigation, route }: Props) {
               </View>
               <Text style={styles.code}>{driver.code}</Text>
             </View>
-          </View>
+          </Pressable>
         )}
 
         <View style={styles.metaRow}>
@@ -217,7 +237,8 @@ const styles = StyleSheet.create({
     gap: spacing.lg,
   },
   grabber: { alignSelf: 'center', width: 56, height: 5, borderRadius: 3, backgroundColor: colors.divider },
-  waitingCard: { backgroundColor: colors.primarySofter, borderRadius: radius.lg, padding: spacing.lg },
+  waitingCard: { backgroundColor: colors.primarySofter, borderRadius: radius.lg, padding: spacing.lg, gap: spacing.xs },
+  nearbyText: { ...typography.title, color: colors.primary },
   statusRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
   eta: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   etaDot: { width: 12, height: 12, borderRadius: 6, backgroundColor: colors.textMuted },

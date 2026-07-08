@@ -27,6 +27,9 @@ export const colors = {
   // Feedback
   danger: '#E2574C',
   success: '#2BA84A',
+  warning: '#C77700',
+  warningSoft: '#FFF7ED', // soft warning surface (e.g. wallet shortfall)
+  warningSoftBorder: '#FED7AA',
   star: '#2F6BC4',
 
   // Misc

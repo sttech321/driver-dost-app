@@ -19,11 +19,13 @@ import { bookingApi } from '@/api/booking.api';
 import { driverPortalApi } from '@/api/driverPortal.api';
 import { ChatMessage } from '@/api/types';
 import { getSocket, joinBooking } from '@/realtime/socket';
+import { useNotifications } from '@/context/NotificationContext';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'Chat'>;
 
 export function ChatScreen({ navigation, route }: Props) {
   const { bookingId, peerName, asDriver } = route.params;
+  const { markChatRead } = useNotifications();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState('');
   const listRef = useRef<FlatList<ChatMessage>>(null);
@@ -45,6 +47,8 @@ export function ChatScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     load();
+    // Opening the thread clears its unread chat notifications (Inbox badge).
+    markChatRead(bookingId);
     // Realtime: join the room and receive messages instantly.
     joinBooking(bookingId);
     const socket = getSocket();

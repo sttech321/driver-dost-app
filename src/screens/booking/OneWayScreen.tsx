@@ -11,6 +11,7 @@ import { bookingApi } from '@/api/booking.api';
 import { Place, SavedPlace } from '@/api/types';
 import { resolvePlace } from '@/utils/resolvePlace';
 import { formatSchedule } from '@/utils/formatSchedule';
+import { useRoute } from '@/hooks/useRoute';
 
 type Props = NativeStackScreenProps<AppStackParamList, 'OneWay'>;
 
@@ -39,17 +40,20 @@ export function OneWayScreen({ navigation }: Props) {
     return pts;
   }, [pickupPlace, destPlace, coords]);
 
-  const route = pickupPlace && destPlace
-    ? [
-        { lat: pickupPlace.lat, lng: pickupPlace.lng },
-        { lat: destPlace.lat, lng: destPlace.lng },
-      ]
-    : undefined;
+  // Road-snapped route between the chosen pickup and destination.
+  const route = useRoute(
+    pickupPlace ? { lat: pickupPlace.lat, lng: pickupPlace.lng } : null,
+    destPlace ? { lat: destPlace.lat, lng: destPlace.lng } : null
+  );
 
   const selectSaved = (sp: SavedPlace) => {
-    setDestination(sp.label);
+    // Show the actual location (address / coords), not the saved nickname.
+    const locationText =
+      sp.addressLine ||
+      (sp.lat != null && sp.lng != null ? `${sp.lat.toFixed(5)}, ${sp.lng.toFixed(5)}` : sp.label);
+    setDestination(locationText);
     if (sp.lat != null && sp.lng != null) {
-      setDestPlace({ id: sp.id, label: sp.label, address: sp.addressLine, lat: sp.lat, lng: sp.lng });
+      setDestPlace({ id: sp.id, label: sp.addressLine || sp.label, address: sp.addressLine, lat: sp.lat, lng: sp.lng });
     }
   };
 

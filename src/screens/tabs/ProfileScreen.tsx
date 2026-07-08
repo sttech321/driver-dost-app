@@ -2,16 +2,22 @@ import React, { useCallback, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, radius, spacing, typography } from '@/theme';
-import { Screen, Avatar, Icon, Button, TextField } from '@/components';
+import { Screen, Avatar, Icon, Button, TextField, PlaceAutocomplete, AddMoneyModal } from '@/components';
 import { useAuth } from '@/context/AuthContext';
+import { useAppLocation } from '@/context/LocationContext';
 import { userApi } from '@/api/user.api';
-import { SavedPlace } from '@/api/types';
+import { Place, SavedPlace } from '@/api/types';
+import { resolvePlace } from '@/utils/resolvePlace';
 
 export function ProfileScreen() {
-  const { user, signOut } = useAuth();
+  const { user, signOut, refreshUser } = useAuth();
+  const { location } = useAppLocation();
   const [places, setPlaces] = useState<SavedPlace[]>([]);
   const [label, setLabel] = useState('');
   const [address, setAddress] = useState('');
+  const [addressPlace, setAddressPlace] = useState<Place | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [addMoneyOpen, setAddMoneyOpen] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -28,17 +34,39 @@ export function ProfileScreen() {
   );
 
   const addPlace = async () => {
-    if (!label || !address) {
-      Alert.alert('Add place', 'Enter a label and address.');
+    if (!label.trim()) {
+      Alert.alert('Add place', 'Please enter a label (e.g. Home).');
       return;
     }
+    if (!address.trim()) {
+      Alert.alert('Add place', 'Search and pick an address (or drop a pin on the map).');
+      return;
+    }
+    setSaving(true);
     try {
-      const place = await userApi.createSavedPlace({ label, addressLine: address });
+      // Resolve real coordinates: use the picked place, else geocode the text.
+      const resolved = await resolvePlace(address, addressPlace, {
+        lat: location.lat,
+        lng: location.lng,
+      });
+      if (!resolved) {
+        Alert.alert('Pick a location', 'Choose the address from the suggestions or the map.');
+        return;
+      }
+      const place = await userApi.createSavedPlace({
+        label: label.trim(),
+        addressLine: resolved.address || resolved.label,
+        lat: resolved.lat,
+        lng: resolved.lng,
+      });
       setPlaces((p) => [place, ...p]);
       setLabel('');
       setAddress('');
+      setAddressPlace(null);
     } catch (e: any) {
       Alert.alert('Could not save', e.message);
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -60,6 +88,10 @@ export function ProfileScreen() {
         <View style={styles.wallet}>
           <Text style={typography.caption}>Wallet Balance</Text>
           <Text style={typography.h3}>Rs {Number(user?.walletBalance ?? 0).toFixed(2)}</Text>
+          <Pressable style={styles.addMoneyBtn} onPress={() => setAddMoneyOpen(true)}>
+            <Icon name="plus" size={16} color={colors.white} />
+            <Text style={styles.addMoneyText}>Add Money</Text>
+          </Pressable>
         </View>
       </View>
 
@@ -87,8 +119,22 @@ export function ProfileScreen() {
 
       <View style={styles.addBox}>
         <TextField icon="map-pin" placeholder="Label (e.g. Home)" value={label} onChangeText={setLabel} />
-        <TextField icon="map-pin" placeholder="Address (e.g. Sector 174)" value={address} onChangeText={setAddress} />
-        <Button title="Add Saved Place" variant="outline" leftIcon={<Icon name="plus" size={18} color={colors.primary} />} onPress={addPlace} />
+        <PlaceAutocomplete
+          placeholder="Search address or pick on map"
+          value={address}
+          onChangeText={setAddress}
+          onSelectPlace={setAddressPlace}
+          onClearPlace={() => setAddressPlace(null)}
+          biasCoords={{ lat: location.lat, lng: location.lng }}
+          zIndex={5}
+        />
+        <Button
+          title="Add Saved Place"
+          variant="outline"
+          loading={saving}
+          leftIcon={<Icon name="plus" size={18} color={colors.primary} />}
+          onPress={addPlace}
+        />
       </View>
 
       <Button
@@ -97,6 +143,12 @@ export function ProfileScreen() {
         leftIcon={<Icon name="log-out" size={20} color={colors.primary} />}
         onPress={signOut}
         style={{ marginTop: spacing.lg, marginBottom: spacing.xxl }}
+      />
+
+      <AddMoneyModal
+        visible={addMoneyOpen}
+        onClose={() => setAddMoneyOpen(false)}
+        onToppedUp={refreshUser}
       />
     </Screen>
   );
@@ -111,8 +163,19 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xxl,
     alignItems: 'center',
-    gap: 2,
+    gap: spacing.sm,
   },
+  addMoneyBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.xs,
+    backgroundColor: colors.primary,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  addMoneyText: { ...typography.label, color: colors.white },
   placeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -122,5 +185,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
   },
   placeDot: { width: 24, height: 24, borderRadius: 12, backgroundColor: '#C9D2E0' },
-  addBox: { gap: spacing.md, marginTop: spacing.lg },
+  // Elevated so the address autocomplete dropdown overlays content below it.
+  addBox: { gap: spacing.md, marginTop: spacing.lg, zIndex: 10 },
 });

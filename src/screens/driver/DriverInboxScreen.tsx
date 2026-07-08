@@ -4,39 +4,27 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { CompositeNavigationProp } from '@react-navigation/native';
 import { BottomTabNavigationProp } from '@react-navigation/bottom-tabs';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { AppStackParamList, TabParamList } from '@/navigation/types';
+import { DriverStackParamList, DriverTabParamList } from '@/navigation/types';
 import { colors, radius, spacing, typography } from '@/theme';
 import { Screen, Avatar, Icon } from '@/components';
-import { bookingApi } from '@/api/booking.api';
+import { driverPortalApi } from '@/api/driverPortal.api';
 import { Booking } from '@/api/types';
 import { useNotifications } from '@/context/NotificationContext';
 
 type Nav = CompositeNavigationProp<
-  BottomTabNavigationProp<TabParamList, 'Inbox'>,
-  NativeStackNavigationProp<AppStackParamList>
+  BottomTabNavigationProp<DriverTabParamList, 'DriverInbox'>,
+  NativeStackNavigationProp<DriverStackParamList>
 >;
 
-export function InboxScreen() {
+export function DriverInboxScreen() {
   const navigation = useNavigation<Nav>();
   const { items } = useNotifications();
   const [chats, setChats] = useState<Booking[]>([]);
 
-  // Unread chat-message count per booking → per-thread "new message" badge.
-  const unreadByBooking = useMemo(() => {
-    const map: Record<string, number> = {};
-    for (const n of items) {
-      if (n.type === 'CHAT_MESSAGE' && !n.isRead && n.data?.bookingId) {
-        map[n.data.bookingId] = (map[n.data.bookingId] || 0) + 1;
-      }
-    }
-    return map;
-  }, [items]);
-
   const load = useCallback(async () => {
     try {
-      const all = await bookingApi.list();
-      // Conversations exist for bookings that have an assigned driver.
-      setChats(all.filter((b) => b.driver));
+      const all = await driverPortalApi.myBookings();
+      setChats(all.filter((b) => b.user)); // threads with a rider
     } catch {
       /* ignore */
     }
@@ -48,11 +36,21 @@ export function InboxScreen() {
     }, [load])
   );
 
+  const unreadByBooking = useMemo(() => {
+    const map: Record<string, number> = {};
+    for (const n of items) {
+      if (n.type === 'CHAT_MESSAGE' && !n.isRead && n.data?.bookingId) {
+        map[n.data.bookingId] = (map[n.data.bookingId] || 0) + 1;
+      }
+    }
+    return map;
+  }, [items]);
+
   return (
     <Screen padded={false}>
       <View style={styles.header}>
-        <Text style={typography.h2}>Inbox</Text>
-        <Text style={typography.bodyMuted}>Chat with your drivers</Text>
+        <Text style={typography.h2}>Chat</Text>
+        <Text style={typography.bodyMuted}>Messages with your riders</Text>
       </View>
       <FlatList
         data={chats}
@@ -67,18 +65,16 @@ export function InboxScreen() {
               onPress={() =>
                 navigation.navigate('Chat', {
                   bookingId: item.id,
-                  peerName: item.driver?.name ?? 'Driver',
+                  peerName: item.user?.name ?? 'Rider',
+                  asDriver: true,
                 })
               }
             >
-              <Avatar uri={item.driver?.photoUrl} size={52} />
+              <Avatar uri={item.user?.photoUrl} size={52} />
               <View style={{ flex: 1 }}>
-                <Text style={typography.title}>{item.driver?.name}</Text>
-                <Text
-                  style={[typography.caption, unread > 0 && styles.newMsg]}
-                  numberOfLines={1}
-                >
-                  {unread > 0 ? `${unread} new message${unread > 1 ? 's' : ''}` : `${item.driver?.title} · ${item.status}`}
+                <Text style={typography.title}>{item.user?.name ?? 'Rider'}</Text>
+                <Text style={[typography.caption, unread > 0 && styles.newMsg]} numberOfLines={1}>
+                  {unread > 0 ? `${unread} new message${unread > 1 ? 's' : ''}` : item.status}
                 </Text>
               </View>
               <View style={styles.iconWrap}>
@@ -95,9 +91,7 @@ export function InboxScreen() {
         ListEmptyComponent={
           <View style={styles.empty}>
             <Icon name="message-square" size={40} color={colors.textMuted} />
-            <Text style={[typography.bodyMuted, { marginTop: spacing.md }]}>
-              No conversations yet.
-            </Text>
+            <Text style={[typography.bodyMuted, { marginTop: spacing.md }]}>No conversations yet.</Text>
           </View>
         }
       />

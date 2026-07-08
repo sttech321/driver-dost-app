@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import MapView, { PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, typography } from '@/theme';
 import { Icon } from './Icon';
@@ -20,7 +20,8 @@ const DEFAULT = { lat: 30.69, lng: 76.72 }; // Mohali
 
 export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapPickerModalProps) {
   const mapRef = useRef<MapView>(null);
-  const center = useRef({ ...(initialCoords ?? DEFAULT) });
+  // The marker's EXACT position — this is what gets confirmed.
+  const [marker, setMarker] = useState({ ...(initialCoords ?? DEFAULT) });
   const [picked, setPicked] = useState<Place | null>(null);
   const [loading, setLoading] = useState(false);
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
@@ -34,26 +35,25 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
     longitudeDelta: 0.02,
   };
 
-  // A RN Modal hides but does NOT unmount its children, so re-sync everything
-  // each time it opens: reset the center to the latest bias, recenter the map,
-  // clear the previous pick, and reverse-geocode the fresh center.
   useEffect(() => {
     if (!visible) return;
-    center.current = { ...(initialCoords ?? DEFAULT) };
+    const c = { ...(initialCoords ?? DEFAULT) };
+    setMarker(c);
     setPicked(null);
     mapRef.current?.animateToRegion(
-      { latitude: center.current.lat, longitude: center.current.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
+      { latitude: c.lat, longitude: c.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
       0
     );
-    reverse(center.current.lat, center.current.lng);
+    reverse(c.lat, c.lng);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [visible, initialCoords?.lat, initialCoords?.lng]);
 
+  // Reverse-geocode for the LABEL only — the coordinates always stay the pin's.
   const reverse = (lat: number, lng: number) => {
     if (debounce.current) clearTimeout(debounce.current);
     setLoading(true);
     debounce.current = setTimeout(async () => {
-      const id = ++reqId.current; // guard against out-of-order responses
+      const id = ++reqId.current;
       try {
         const place = await geocodeApi.reverse(lat, lng);
         if (id === reqId.current) setPicked(place);
@@ -62,17 +62,18 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
       } finally {
         if (id === reqId.current) setLoading(false);
       }
-    }, 450);
+    }, 400);
   };
 
-  const onRegionChangeComplete = (r: Region) => {
-    center.current = { lat: r.latitude, lng: r.longitude };
-    reverse(r.latitude, r.longitude);
+  const moveMarker = (lat: number, lng: number) => {
+    setMarker({ lat, lng });
+    reverse(lat, lng);
   };
 
   const goToCurrent = async () => {
     const c = await fetchCurrent();
     if (!c) return;
+    moveMarker(c.lat, c.lng);
     mapRef.current?.animateToRegion(
       { latitude: c.lat, longitude: c.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 },
       500
@@ -80,10 +81,14 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
   };
 
   const confirm = () => {
-    const { lat, lng } = center.current;
-    const fallback = { id: `${lat},${lng}`, label: 'Selected location', address: '', lat, lng };
-    // While a reverse-geocode is in flight, `picked` is stale — trust the center.
-    onPick(loading ? fallback : picked ?? fallback);
+    // Always return the EXACT marker coordinates; label/address is just context.
+    onPick({
+      id: `${marker.lat},${marker.lng}`,
+      label: picked?.label || 'Selected location',
+      address: picked?.address || '',
+      lat: marker.lat,
+      lng: marker.lng,
+    });
   };
 
   return (
@@ -103,13 +108,21 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
           <MapView
             ref={mapRef}
             style={StyleSheet.absoluteFill}
-            provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+            provider={PROVIDER_GOOGLE}
             initialRegion={region}
-            onRegionChangeComplete={onRegionChangeComplete}
-          />
-          {/* Fixed center pin — the map moves underneath it. */}
-          <View pointerEvents="none" style={styles.centerPin}>
-            <Icon name="map-pin" size={40} color={colors.primary} />
+            onPress={(e) => moveMarker(e.nativeEvent.coordinate.latitude, e.nativeEvent.coordinate.longitude)}
+          >
+            <Marker
+              coordinate={{ latitude: marker.lat, longitude: marker.lng }}
+              draggable
+              onDragEnd={(e) =>
+                moveMarker(e.nativeEvent.coordinate.latitude, e.nativeEvent.coordinate.longitude)
+              }
+              pinColor={colors.primary}
+            />
+          </MapView>
+          <View pointerEvents="none" style={styles.hint}>
+            <Text style={styles.hintText}>Tap the map or drag the pin</Text>
           </View>
         </View>
 
@@ -125,13 +138,11 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
               ) : (
                 <>
                   <Text style={typography.title} numberOfLines={1}>
-                    {picked?.label ?? 'Drop the pin on your spot'}
+                    {picked?.label ?? 'Selected location'}
                   </Text>
-                  {!!picked?.address && (
-                    <Text style={typography.caption} numberOfLines={2}>
-                      {picked.address}
-                    </Text>
-                  )}
+                  <Text style={typography.caption} numberOfLines={1}>
+                    {picked?.address || `${marker.lat.toFixed(5)}, ${marker.lng.toFixed(5)}`}
+                  </Text>
                 </>
               )}
             </View>
@@ -163,13 +174,16 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   mapWrap: { flex: 1 },
-  centerPin: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    // Lift the pin tip to the exact center.
-    marginBottom: 40,
+  hint: {
+    position: 'absolute',
+    top: spacing.md,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(15,23,42,0.75)',
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
   },
+  hintText: { ...typography.caption, color: colors.white },
   sheet: {
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,

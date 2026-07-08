@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { colors, radius, spacing, typography } from '@/theme';
@@ -7,6 +7,8 @@ import { driverPortalApi } from '@/api/driverPortal.api';
 import { Booking, BookingType } from '@/api/types';
 import { formatSchedule } from '@/utils/formatSchedule';
 import { getSocket } from '@/realtime/socket';
+import { useLocation } from '@/hooks/useLocation';
+import { distanceKm, REQUEST_RADIUS_KM } from '@/utils/distance';
 
 const TYPE_META: Record<BookingType, { label: string; icon: IconName }> = {
   ONE_WAY: { label: 'One Way', icon: 'arrow-up' },
@@ -18,22 +20,37 @@ const TYPE_META: Record<BookingType, { label: string; icon: IconName }> = {
 export function DriverRequestsScreen() {
   const [requests, setRequests] = useState<Booking[]>([]);
   const [accepting, setAccepting] = useState<string | null>(null);
+  const { coords, fetchCurrent } = useLocation();
+  const coordsRef = useRef<{ lat: number; lng: number } | null>(null);
 
+  // Load requests near the driver (server filters to REQUEST_RADIUS_KM).
   const load = useCallback(async () => {
+    const c = coordsRef.current;
     try {
-      setRequests(await driverPortalApi.requests());
+      setRequests(await driverPortalApi.requests({ lat: c?.lat, lng: c?.lng }));
     } catch {
       /* ignore */
     }
   }, []);
 
-  // Realtime: new requests appear instantly; taken/cancelled ones disappear.
-  // Listeners stay mounted (push-only, cheap) so the list is fresh even in the
-  // background — no polling needed for liveness.
+  // When the driver's GPS resolves, remember it and refresh.
+  useEffect(() => {
+    coordsRef.current = coords;
+    if (coords) load();
+  }, [coords, load]);
+
+  // Realtime: new requests appear instantly (filtered to the radius client-side
+  // too); taken/cancelled ones disappear. Push-only, no background polling.
   useEffect(() => {
     const socket = getSocket();
-    const onNew = (b: Booking) =>
+    const onNew = (b: Booking) => {
+      const c = coordsRef.current;
+      if (c && b.pickupLat != null && b.pickupLng != null) {
+        const d = distanceKm(c, { lat: b.pickupLat, lng: b.pickupLng });
+        if (d != null && d > REQUEST_RADIUS_KM) return; // outside this driver's range
+      }
       setRequests((prev) => (prev.some((x) => x.id === b.id) ? prev : [b, ...prev]));
+    };
     const onTaken = ({ bookingId }: { bookingId: string }) =>
       setRequests((prev) => prev.filter((x) => x.id !== bookingId));
     socket?.on('request:new', onNew);
@@ -47,10 +64,11 @@ export function DriverRequestsScreen() {
   // Poll only while focused (fallback if socket drops).
   useFocusEffect(
     useCallback(() => {
+      fetchCurrent();
       load();
       const t = setInterval(load, 15000);
       return () => clearInterval(t);
-    }, [load])
+    }, [load, fetchCurrent])
   );
 
   const accept = async (b: Booking) => {
@@ -71,7 +89,7 @@ export function DriverRequestsScreen() {
     <Screen padded={false}>
       <View style={styles.header}>
         <Text style={typography.h2}>Ride Requests</Text>
-        <Text style={typography.bodyMuted}>Live requests from nearby riders</Text>
+        <Text style={typography.bodyMuted}>Riders within {REQUEST_RADIUS_KM} km of you</Text>
       </View>
       <FlatList
         data={requests}

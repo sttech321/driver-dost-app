@@ -10,6 +10,8 @@ import { OutstationScreen } from '@/screens/booking/OutstationScreen';
 import { DriverArrivingScreen } from '@/screens/booking/DriverArrivingScreen';
 import { ChatScreen } from '@/screens/booking/ChatScreen';
 import { DriverLeavingScreen } from '@/screens/booking/DriverLeavingScreen';
+import { DriverPublicProfileScreen } from '@/screens/driver/DriverPublicProfileScreen';
+import { NotificationsScreen } from '@/screens/NotificationsScreen';
 
 const Stack = createNativeStackNavigator<AppStackParamList>();
 
@@ -31,6 +33,8 @@ export function AppNavigator() {
           <Stack.Screen name="DriverArriving" component={DriverArrivingScreen} />
           <Stack.Screen name="Chat" component={ChatScreen} />
           <Stack.Screen name="DriverLeaving" component={DriverLeavingScreen} />
+          <Stack.Screen name="DriverProfileView" component={DriverPublicProfileScreen} />
+          <Stack.Screen name="Notifications" component={NotificationsScreen} />
         </>
       )}
     </Stack.Navigator>

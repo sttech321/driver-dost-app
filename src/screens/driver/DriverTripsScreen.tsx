@@ -152,7 +152,10 @@ export function DriverTripsScreen() {
           const next = NEXT[item.status];
           return (
             <View style={styles.card}>
-              <View style={styles.cardHead}>
+              <Pressable
+                style={styles.cardHead}
+                onPress={() => navigation.navigate('DriverTripDetail', { bookingId: item.id })}
+              >
                 <View style={{ flex: 1 }}>
                   <Text style={typography.title}>{item.user?.name || 'Rider'}</Text>
                   <Text style={typography.caption} numberOfLines={1}>
@@ -166,7 +169,8 @@ export function DriverTripsScreen() {
                     {item.status}
                   </Text>
                 </View>
-              </View>
+                <Icon name="chevron-right" size={20} color={colors.textMuted} />
+              </Pressable>
 
               <View style={styles.actions}>
                 {next && (

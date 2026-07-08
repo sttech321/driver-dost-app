@@ -7,6 +7,7 @@ import { Button } from './Button';
 import { geocodeApi } from '@/api/geocode.api';
 import { Place } from '@/api/types';
 import { useLocation } from '@/hooks/useLocation';
+import { loadLeaflet } from './leaflet';
 
 interface MapPickerModalProps {
   visible: boolean;
@@ -17,38 +18,14 @@ interface MapPickerModalProps {
 
 const DEFAULT = { lat: 30.69, lng: 76.72 }; // Mohali
 
-// Load Leaflet from CDN once (no API key, interactive map for web picking).
-let leafletPromise: Promise<any> | null = null;
-function loadLeaflet(): Promise<any> {
-  const w = window as any;
-  if (w.L) return Promise.resolve(w.L);
-  if (leafletPromise) return leafletPromise;
-  leafletPromise = new Promise((resolve, reject) => {
-    const link = document.createElement('link');
-    link.rel = 'stylesheet';
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
-    document.head.appendChild(link);
-    const script = document.createElement('script');
-    script.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
-    script.async = true;
-    script.onload = () => resolve((window as any).L);
-    script.onerror = () => {
-      // Reset the cache so a later open can retry instead of reusing a
-      // permanently-rejected promise.
-      leafletPromise = null;
-      reject(new Error('Failed to load Leaflet'));
-    };
-    document.body.appendChild(script);
-  });
-  return leafletPromise;
-}
-
 export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapPickerModalProps) {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
-  const center = useRef({ ...(initialCoords ?? DEFAULT) });
+  const markerRef = useRef<any>(null);
+  const markerCoord = useRef({ ...(initialCoords ?? DEFAULT) }); // EXACT pin coords
   const debounce = useRef<ReturnType<typeof setTimeout>>(undefined);
   const reqId = useRef(0);
+  const [marker, setMarker] = useState({ ...(initialCoords ?? DEFAULT) });
   const [picked, setPicked] = useState<Place | null>(null);
   const [loading, setLoading] = useState(false);
   const [mapReady, setMapReady] = useState(false);
@@ -56,11 +33,12 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
   const [retryKey, setRetryKey] = useState(0);
   const { fetchCurrent } = useLocation();
 
+  // Reverse-geocode for the LABEL only; coordinates always stay the pin's.
   const reverse = (lat: number, lng: number) => {
     if (debounce.current) clearTimeout(debounce.current);
     setLoading(true);
     debounce.current = setTimeout(async () => {
-      const id = ++reqId.current; // guard against out-of-order responses
+      const id = ++reqId.current;
       try {
         const place = await geocodeApi.reverse(lat, lng);
         if (id === reqId.current) setPicked(place);
@@ -69,54 +47,69 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
       } finally {
         if (id === reqId.current) setLoading(false);
       }
-    }, 450);
+    }, 400);
   };
 
   useEffect(() => {
     if (!visible) return;
     let cancelled = false;
-    center.current = { ...(initialCoords ?? DEFAULT) };
+    markerCoord.current = { ...(initialCoords ?? DEFAULT) };
+    setMarker(markerCoord.current);
     setPicked(null);
     setMapReady(false);
     setLoadError(false);
 
-    loadLeaflet().then((L) => {
-      if (cancelled || !containerRef.current) return;
-      // (Re)create the map fresh each open.
-      if (mapRef.current) {
-        mapRef.current.remove();
-        mapRef.current = null;
-      }
-      const map = L.map(containerRef.current, { zoomControl: true }).setView(
-        [center.current.lat, center.current.lng],
-        15
-      );
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© OpenStreetMap',
-        maxZoom: 19,
-      }).addTo(map);
-      map.on('moveend', () => {
-        const c = map.getCenter();
-        center.current = { lat: c.lat, lng: c.lng };
-        reverse(c.lat, c.lng);
+    loadLeaflet()
+      .then((L) => {
+        if (cancelled || !containerRef.current) return;
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+        const start = markerCoord.current;
+        const map = L.map(containerRef.current, { zoomControl: true }).setView([start.lat, start.lng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(map);
+
+        // Draggable pin (divIcon avoids Leaflet's missing-image issue).
+        const icon = L.divIcon({
+          className: 'dd-pin',
+          html: `<div style="width:18px;height:18px;border-radius:50%;background:${colors.primary};border:3px solid #fff;box-shadow:0 0 0 1px rgba(0,0,0,0.25)"></div>`,
+          iconSize: [18, 18],
+          iconAnchor: [9, 9],
+        });
+        const m = L.marker([start.lat, start.lng], { draggable: true, icon }).addTo(map);
+
+        const apply = (lat: number, lng: number) => {
+          markerCoord.current = { lat, lng };
+          setMarker({ lat, lng });
+          m.setLatLng([lat, lng]);
+          reverse(lat, lng);
+        };
+        map.on('click', (e: any) => apply(e.latlng.lat, e.latlng.lng));
+        m.on('dragend', () => {
+          const p = m.getLatLng();
+          apply(p.lat, p.lng);
+        });
+
+        mapRef.current = map;
+        markerRef.current = m;
+        setMapReady(true);
+        setTimeout(() => map.invalidateSize(), 100);
+        reverse(start.lat, start.lng);
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLoadError(true);
+          setLoading(false);
+        }
       });
-      mapRef.current = map;
-      setMapReady(true);
-      // Container is sized via flexbox after mount — recompute.
-      setTimeout(() => map.invalidateSize(), 100);
-      reverse(center.current.lat, center.current.lng);
-    }).catch(() => {
-      if (!cancelled) {
-        setLoadError(true);
-        setLoading(false);
-      }
-    });
 
     return () => {
       cancelled = true;
       if (mapRef.current) {
         mapRef.current.remove();
         mapRef.current = null;
+        markerRef.current = null;
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,18 +117,26 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
 
   const goToCurrent = async () => {
     const c = await fetchCurrent();
-    if (c && mapRef.current) mapRef.current.setView([c.lat, c.lng], 15);
+    if (!c || !mapRef.current) return;
+    markerCoord.current = c;
+    setMarker(c);
+    markerRef.current?.setLatLng([c.lat, c.lng]);
+    mapRef.current.setView([c.lat, c.lng], 15);
+    reverse(c.lat, c.lng);
   };
 
   const confirm = () => {
-    // Don't submit the default coords if the map never loaded.
     if (loadError || !mapReady) return;
-    const { lat, lng } = center.current;
-    const fallback = { id: `${lat},${lng}`, label: 'Selected location', address: '', lat, lng };
-    onPick(loading ? fallback : picked ?? fallback);
+    const { lat, lng } = markerCoord.current; // EXACT pin coords
+    onPick({
+      id: `${lat},${lng}`,
+      label: picked?.label || 'Selected location',
+      address: picked?.address || '',
+      lat,
+      lng,
+    });
   };
 
-  // Re-runs the init effect (loadLeaflet was reset to null on error, so it retries the CDN).
   const retry = () => setRetryKey((k) => k + 1);
 
   return (
@@ -152,11 +153,10 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
         </SafeAreaView>
 
         <View style={styles.mapWrap}>
-          {/* Raw DOM node Leaflet mounts into (web build = react-dom). */}
           <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-          {!loadError && (
-            <View pointerEvents="none" style={styles.centerPin}>
-              <Icon name="map-pin" size={40} color={colors.primary} />
+          {!loadError && mapReady && (
+            <View pointerEvents="none" style={styles.hint}>
+              <Text style={styles.hintText}>Tap the map or drag the pin</Text>
             </View>
           )}
           {loadError && (
@@ -164,9 +164,6 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
               <Icon name="map-pin" size={36} color={colors.textMuted} />
               <Text style={[typography.title, { textAlign: 'center', marginTop: spacing.sm }]}>
                 Map couldn’t load
-              </Text>
-              <Text style={[typography.caption, { textAlign: 'center', marginBottom: spacing.md }]}>
-                Check your connection, then try again — or use your current location.
               </Text>
               <Pressable style={styles.retryBtn} onPress={retry}>
                 <Text style={[typography.label, { color: colors.white }]}>Retry</Text>
@@ -187,13 +184,11 @@ export function MapPickerModal({ visible, initialCoords, onClose, onPick }: MapP
               ) : (
                 <>
                   <Text style={typography.title} numberOfLines={1}>
-                    {picked?.label ?? 'Drag the map to your spot'}
+                    {picked?.label ?? 'Selected location'}
                   </Text>
-                  {!!picked?.address && (
-                    <Text style={typography.caption} numberOfLines={2}>
-                      {picked.address}
-                    </Text>
-                  )}
+                  <Text style={typography.caption} numberOfLines={1}>
+                    {picked?.address || `${marker.lat.toFixed(5)}, ${marker.lng.toFixed(5)}`}
+                  </Text>
                 </>
               )}
             </View>
@@ -225,6 +220,16 @@ const styles = StyleSheet.create({
   },
   backBtn: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
   mapWrap: { flex: 1, position: 'relative' },
+  hint: {
+    position: 'absolute',
+    top: spacing.md,
+    alignSelf: 'center',
+    backgroundColor: 'rgba(15,23,42,0.75)',
+    borderRadius: 999,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 6,
+  },
+  hintText: { ...typography.caption, color: colors.white },
   errorOverlay: {
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
@@ -237,12 +242,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.sm,
     borderRadius: radius.pill,
-  },
-  centerPin: {
-    ...StyleSheet.absoluteFillObject,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 40,
+    marginTop: spacing.md,
   },
   sheet: {
     paddingHorizontal: spacing.xl,
