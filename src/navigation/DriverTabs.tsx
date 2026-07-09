@@ -1,5 +1,6 @@
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { DriverTabParamList } from './types';
 import { Icon, IconName } from '@/components';
 import { colors, typography } from '@/theme';
@@ -22,6 +23,7 @@ const ICONS: Record<keyof DriverTabParamList, IconName> = {
 
 export function DriverTabs() {
   const { unreadChats } = useNotifications();
+  const insets = useSafeAreaInsets();
 
   return (
     <Tab.Navigator
@@ -29,8 +31,9 @@ export function DriverTabs() {
         headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.textMuted,
-        tabBarLabelStyle: { ...typography.caption, fontWeight: '600' },
-        tabBarStyle: { height: 64, paddingBottom: 8, paddingTop: 8 },
+        tabBarLabelStyle: { ...typography.caption, fontWeight: '600', marginBottom: 4 },
+        // Taller bar + bottom safe-area inset so labels aren't clipped (esp. on 5 tabs / home-indicator devices).
+        tabBarStyle: { height: 74 + insets.bottom, paddingTop: 8, paddingBottom: 12 + insets.bottom },
         tabBarIcon: ({ color, size }) => <Icon name={ICONS[route.name]} size={size} color={color} />,
       })}
     >
